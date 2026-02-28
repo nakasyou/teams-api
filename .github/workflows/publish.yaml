@@ -1,0 +1,174 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-root
+      cancel-in-progress: false
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Ensure workflow runs on branch
+        run: |
+          if [[ '${{ github.ref_type }}' != 'branch' ]]; then
+            echo "This workflow must run on a branch ref to push version updates."
+            echo "Current ref_type: ${{ github.ref_type }}"
+            exit 1
+          fi
+
+      - name: Resolve & bump version
+        id: version
+        shell: bash
+        run: |
+          release_type="$INPUT_RELEASE_TYPE"
+          if ! [[ "$release_type" =~ ^(major|minor|patch)$ ]]; then
+            echo "Invalid release_type: $release_type"
+            exit 1
+          fi
+
+          if [ ! -r package.json ]; then
+            echo "package.json not found at repo root"
+            exit 1
+          fi
+
+          package_name="$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));process.stdout.write((p.name||'').trim())")"
+          if [ -z "$package_name" ]; then
+            echo "package.json must contain a non-empty name"
+            exit 1
+          fi
+
+          has_repository="$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const r=p.repository;const ok=(typeof r==='string'&&r.trim())||(r&&typeof r==='object'&&typeof r.url==='string'&&r.url.trim());process.stdout.write(ok?'yes':'no')")"
+          if [ "$has_repository" != "yes" ]; then
+            echo "package.json must contain a non-empty repository field"
+            exit 1
+          fi
+
+          # Prefer npm registry version if already published; fallback to package.json version
+          if ! current_version="$(npm view "$package_name" version 2>/dev/null | tr -d '\r\n')"; then
+            current_version="$(node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));process.stdout.write((p.version||'').trim())")"
+            if [ -z "$current_version" ]; then
+              echo "Could not fetch npm version and package.json has no version"
+              exit 1
+            fi
+            echo "Could not fetch version from npm for $package_name, using package.json version: $current_version"
+          else
+            echo "Using npm registry version for $package_name: $current_version"
+          fi
+
+          if ! [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([.-][0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid current package version: $current_version"
+            exit 1
+          fi
+
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+          patch="${BASH_REMATCH[3]}"
+
+          case "$release_type" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+
+          version="$major.$minor.$patch"
+          tag="v$version"
+
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "Tag already exists: $tag"
+            exit 1
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists: $tag"
+            exit 1
+          fi
+
+          echo "name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Update package.json version
+        run: |
+          node -e "const fs=require('fs');const path='package.json';const version='${{ steps.version.outputs.version }}';const pkg=JSON.parse(fs.readFileSync(path,'utf8'));pkg.version=version;fs.writeFileSync(path,JSON.stringify(pkg,null,2)+'\n');"
+
+      - name: Build
+        run: bun run build
+
+      - name: Publish to npm (provenance)
+        run: |
+          npm publish --provenance --access public
+
+      - name: Commit, tag and push
+        id: git_push
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git add package.json
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            sha="$(git rev-parse HEAD)"
+          else
+            git commit -m "chore(release): v${{ steps.version.outputs.version }}"
+            git pull --rebase origin "${{ github.ref_name }}"
+            git push origin "HEAD:${{ github.ref_name }}"
+            sha="$(git rev-parse HEAD)"
+          fi
+
+          git tag "${{ steps.version.outputs.tag }}" "$sha"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release (generated notes)
+        run: |
+          gh release create '${{ steps.version.outputs.tag }}' \
+            --generate-notes \
+            --target '${{ steps.git_push.outputs.sha }}'
