@@ -2,6 +2,11 @@
 
 `msteams` is a lightweight TypeScript library and CLI for interacting with Microsoft Teams endpoints used by the web client.
 
+## Warning
+
+* Node.js is currently not supported yet. Use Bun
+* Auth token should be updated in 24 hours. Automatic token updating is working in progress.
+
 ## Overview
 
 - CLI: use the `teams` command to fetch notifications, messages, channels, and user/team data
@@ -25,13 +30,13 @@ npm install msteams
 
 ```bash
 # Show help
-teams --help
+bunx --bun teams --help
 ```
 
 ### Set refresh token
 
 ```bash
-teams set-refresh-token --refresh-token=<your_refresh_token>
+bunx --bun teams set-refresh-token --refresh-token=<your_refresh_token>
 ```
 
 - Default profile path: `~/.teams-cli/default.json`
