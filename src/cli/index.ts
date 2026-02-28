@@ -12,9 +12,8 @@ import {
   getProfileLabel,
 } from './profile'
 
-if (import.meta.main) {
-  await runCli(process.argv.slice(2))
-}
+
+await runCli(process.argv.slice(2))
 
 async function runCli(argv: string[]): Promise<void> {
   const args = parseArgs(argv)
