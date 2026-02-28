@@ -1,49 +1,50 @@
-# teams-api
+# teams-api: Micosoft Teams CLI/TS Client
 
 `msteams` is a lightweight TypeScript library and CLI for interacting with Microsoft Teams endpoints used by the web client.
 
-## Warning
+> [!WARNING]
+> * Auth token should be updated in 24 hours. Automatic token updating is working in progress.
+> * This package uses unofficial endpoints. Behavior may change if Microsoft updates those APIs.
 
-* Node.js is currently not supported yet. Use Bun
-* Auth token should be updated in 24 hours. Automatic token updating is working in progress.
+## CLI
 
-## Overview
+### Installation
 
-- CLI: use the `teams` command to fetch notifications, messages, channels, and user/team data
-- Library: use `TeamsClient` and `TokenManager` to access the same endpoints from TypeScript
-- Token handling: refresh token is stored as a local profile in `~/.teams-cli/<name>.json`
-- Machine mode: use `--json` for scripts and automation
-
-> Warning: This package uses unofficial endpoints. Behavior may change if Microsoft updates those APIs.
-
-## Install
-
+Temporary running:
 ```bash
-bun add msteams
+npx msteams # npm
+bunx msteams # Bun
+deno run -A npm:msteams # Deno
+pnpm dlx msteams # pnpm
 ```
 
+Global install:
 ```bash
-npm install msteams
+npm i -g msteams # npm
+bun i -g msteams # Bun
+deno install --global -A npm:msteams
+pnpm i -g msteams
 ```
 
-## CLI usage
+### Usage
 
+#### Help
+
+Show help:
 ```bash
-# Show help
-bunx --bun teams --help
+teams --help
 ```
 
-### Set refresh token
+#### Set refresh token
 
 ```bash
 bunx --bun teams set-refresh-token --refresh-token=<your_refresh_token>
 ```
-
 - Default profile path: `~/.teams-cli/default.json`
 - You can change the profile with `--profile`
 - You can also pass token via `--refresh-token` or `REFRESH_TOKEN`
 
-### Common commands
+#### Common commands
 
 ```bash
 # Fetch latest notifications (default: 20)
@@ -65,7 +66,7 @@ teams teams channels <teamId>
 teams me
 ```
 
-### Common options
+#### Common options
 
 - `--json`: output only JSON
 - `--no-color`: disable ANSI colors
@@ -74,7 +75,7 @@ teams me
 - `--refresh-token=<token>`: set token for current run
 - `--help`: show help
 
-## Library usage
+## Library
 
 ```ts
 import { TeamsClient, TokenManager } from 'msteams'
@@ -106,15 +107,11 @@ console.log(notifications.messages?.length ?? 0)
 
 ```bash
 bun install
-bun run build
 bun run fmt
+bun run build
 ```
 
-The package uses `vite-plus` to build both library and CLI entry points.
-
-## Repository
-
-- https://github.com/nakasyou/teams-api
+The package uses Vite+ to build both library and CLI entry points.
 
 ## License
 
