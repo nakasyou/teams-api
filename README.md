@@ -26,6 +26,11 @@ deno install --global -A npm:msteams
 pnpm i -g msteams
 ```
 
+Install a skill for AI agents:
+```bash
+bunx skills add nakasyou/teams-api
+```
+
 ### Usage
 
 #### Help
