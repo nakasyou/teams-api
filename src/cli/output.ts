@@ -71,9 +71,10 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     return
   }
 
-  if (command === 'set-refresh-token') {
+  if (command === 'login') {
     console.log('Usage:')
-    console.log('  teams set-refresh-token --refresh-token=<token> [options]')
+    console.log('  teams login --ests-auth-persistent=<token> [options] (recommended)')
+    console.log('  teams login --refresh-token=<token> [options] (deprecated)')
     console.log('  Save refresh token to the selected profile')
     return
   }
@@ -110,7 +111,8 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('Global options:')
     console.log('  --profile=<name>         Use ~/.teams-cli/<name>.json (default: default)')
     console.log('  --profile-json=<path>    Use custom profile json path')
-    console.log('  --refresh-token=<token>  Use and persist this refresh token')
+    console.log('  --ests-auth-persistent=<token>  Preferred: generate token from session cookie')
+    console.log('  --refresh-token=<token>          Deprecated: use --ests-auth-persistent instead')
     console.log(
       '  --json                   Output machine-readable JSON only (default in automation)',
     )
@@ -124,9 +126,7 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  teams list                          List all teams for the current user')
     console.log('  teams channels <teamId>             List channels in a team')
     console.log('  me                                  Fetch current user snapshot')
-    console.log(
-      '  set-refresh-token --refresh-token=<token> Save refresh token to selected profile',
-    )
+    console.log('  login --ests-auth-persistent=<token> Save session token to selected profile')
   }
 }
 
@@ -165,9 +165,9 @@ export function printResult(
   const colorize = (color: Color, text: string) =>
     context.color ? `${ANSI_CODES[color]}${text}${ANSI_CODES.reset}` : text
 
-  if (result.command === 'set-refresh-token') {
+  if (result.command === 'login') {
     const payload = result.data as { profilePath: string; profile: string }
-    console.log(colorize('bold', 'Refresh token stored'))
+    console.log(colorize('bold', 'Session credentials stored'))
     console.log(`  profile: ${colorize('cyan', payload.profile)}`)
     console.log(`  file: ${colorize('dim', payload.profilePath)}`)
     return

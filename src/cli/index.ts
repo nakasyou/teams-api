@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { TeamsClient } from '../client'
 import { TokenManager } from '../auth/TokenManager'
+import { loginFromEstsAuthPersistent } from '../auth/estsAuth'
 import { createContext, printError, printHelp, printResult } from './output'
 import { parseArgs } from './args'
 import { executeCommand } from './commands'
@@ -8,10 +9,9 @@ import {
   resolveProfile,
   resolveProfilePath,
   resolveRefreshTokenForStore,
-  saveRefreshToken,
+  saveProfile,
   getProfileLabel,
 } from './profile'
-
 
 await runCli(process.argv.slice(2))
 
@@ -33,15 +33,15 @@ async function runCli(argv: string[]): Promise<void> {
     return
   }
 
-  if (args.command === 'set-refresh-token') {
+  if (args.command === 'login') {
     try {
       const profilePath = resolveProfilePath(args)
-      const token = resolveRefreshTokenForStore(args)
-      await saveRefreshToken(profilePath, token)
+      const tokenState = await resolveRefreshTokenForStore(args)
+      await saveProfile(profilePath, tokenState)
       printResult(
         context,
         {
-          command: 'set-refresh-token',
+          command: 'login',
           data: {
             profile: getProfileLabel(args),
             profilePath,
@@ -57,15 +57,33 @@ async function runCli(argv: string[]): Promise<void> {
   }
 
   try {
-    const { token, profilePath, profileLabel } = await resolveProfile(args)
-    const tokenManager = new TokenManager(token)
+    const { token, profilePath, profileLabel, refreshTokenExpiresIn, ESTSAUTHPERSISTENT } =
+      await resolveProfile(args)
+    const tokenManager = new TokenManager(
+      token,
+      refreshTokenExpiresIn,
+      ESTSAUTHPERSISTENT
+        ? async () => {
+            const tokenRes = await loginFromEstsAuthPersistent(ESTSAUTHPERSISTENT)
+            return {
+              refresh_token: tokenRes.refresh_token,
+              refresh_token_expires_in: tokenRes.refresh_token_expires_in,
+            }
+          }
+        : undefined,
+    )
     const client = new TeamsClient(tokenManager)
     const result = await executeCommand(args, client, context)
     if (result.command === 'help' && typeof result.data === 'string') {
       printHelp(context, result.data)
       return
     }
-    await saveRefreshToken(profilePath, tokenManager.getRefreshToken())
+    const profileState = {
+      refreshToken: tokenManager.getRefreshToken(),
+      refreshTokenExpiresIn: tokenManager.getRefreshTokenExpiresIn(),
+      ESTSAUTHPERSISTENT,
+    }
+    await saveProfile(profilePath, profileState)
     printResult(context, result, profileLabel)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

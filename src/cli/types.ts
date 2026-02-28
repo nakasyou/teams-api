@@ -7,7 +7,7 @@ export type CommandName =
   | 'list'
   | 'teams'
   | 'channels'
-  | 'set-refresh-token'
+  | 'login'
   | 'help'
 
 export type ParsedArgs = {
@@ -16,6 +16,7 @@ export type ParsedArgs = {
   commandArgs: string[]
   profileName: string
   profileJsonPath: string | undefined
+  estsAuthPersistent: string | undefined
   refreshToken: string | undefined
   jsonOutput: boolean
   noColor: boolean
@@ -36,4 +37,8 @@ export type ResolvedProfile = {
   token: string
   profilePath: string
   profileLabel: string
+  refreshToken?: string
+  refreshTokenExpiresIn?: number
+  refreshTokenUpdatedAt?: number
+  ESTSAUTHPERSISTENT?: string
 }

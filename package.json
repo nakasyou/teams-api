@@ -1,25 +1,25 @@
 {
   "name": "msteams",
-  "private": false,
   "version": "0.1.3",
-  "files": [
-    "dist"
-  ],
+  "private": false,
   "license": "MIT",
-  "bin": {
-    "teams": "dist/cli/index.mjs"
-  },
-  "exports": {
-    ".": {
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.mts"
-    }
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/nakasyou/teams-api.git"
   },
+  "bin": {
+    "teams": "dist/cli/index.mjs"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
   "scripts": {
     "cli": "bun run src/cli/index.ts",
     "teams": "bun run src/cli/index.ts",

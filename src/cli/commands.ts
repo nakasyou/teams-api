@@ -171,8 +171,8 @@ export async function executeCommand(
       }
       throw new Error(`Unknown teams subcommand: ${subCommand}`)
     }
-    case 'set-refresh-token':
-      throw new Error('set-refresh-token is a profile-only command')
+    case 'login':
+      throw new Error('login is a profile-only command')
     case 'help':
       return { command: 'help', data: undefined }
   }

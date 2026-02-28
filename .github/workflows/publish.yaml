@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: "Version bump type"
+        description: 'Version bump type'
         required: true
         type: choice
         options:
@@ -48,8 +48,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

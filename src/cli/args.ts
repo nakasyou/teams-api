@@ -13,6 +13,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     commandArgs: [],
     profileName: DEFAULT_PROFILE_NAME,
     profileJsonPath: undefined,
+    estsAuthPersistent: undefined,
     refreshToken: undefined,
     jsonOutput: false,
     noColor: false,
@@ -76,6 +77,19 @@ export function parseArgs(argv: string[]): ParsedArgs {
       continue
     }
 
+    if (token === '--ests-auth-persistent' || token.startsWith('--ests-auth-persistent=')) {
+      const value =
+        token === '--ests-auth-persistent'
+          ? argv[index + 1]
+          : token.slice('--ests-auth-persistent='.length)
+      if (!value) {
+        throw new Error('Missing --ests-auth-persistent value')
+      }
+      parsed.estsAuthPersistent = value
+      index += token === '--ests-auth-persistent' ? 2 : 1
+      continue
+    }
+
     throw new Error(`Unknown option: ${token}`)
   }
 
@@ -103,7 +117,7 @@ function parseCommand(input: string): CommandName {
     input === 'channel' ||
     input === 'me' ||
     input === 'teams' ||
-    input === 'set-refresh-token' ||
+    input === 'login' ||
     input === 'help'
   ) {
     return input
