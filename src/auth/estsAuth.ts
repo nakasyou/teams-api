@@ -123,19 +123,20 @@ export async function loginFromEstsAuthPersistent(
   tokenFormData.set('grant_type', 'authorization_code')
   tokenFormData.set('client_info', '1')
 
-  const tokenRes = (
+  const tokenRes = (await (
     await fetch(
       'https://login.microsoftonline.com/common/oauth2/v2.0/token?client-request-id=Core-713ccf6c-567d-48bd-be19-b4bc98f1e025',
       {
         headers: {
           Referer: 'https://teams.cloud.microsoft/',
           Origin: 'https://teams.cloud.microsoft',
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
         },
         body: tokenFormData.toString(),
         method: 'POST',
       },
     )
-  ).json() as Promise<LoginFromEstsAuthResponse>
+  ).json()) as Promise<LoginFromEstsAuthResponse>
 
   return tokenRes
 }

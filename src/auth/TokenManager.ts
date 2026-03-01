@@ -77,10 +77,10 @@ export class TokenManager implements ScopeTokenProvider {
             referer: 'https://teams.cloud.microsoft/',
           },
           referrer: 'https://teams.cloud.microsoft/',
-          body: formData,
+          body: formData.toString(),
           method: 'POST',
           mode: 'cors',
-          credentials: 'omit',
+          credentials: 'include',
         },
       )
 
