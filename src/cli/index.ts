@@ -5,6 +5,8 @@ import { loginFromEstsAuthPersistent } from '../auth/estsAuth'
 import { createContext, printError, printHelp, printResult } from './output'
 import { parseArgs } from './args'
 import { executeCommand } from './commands'
+import { promptEstsAuthPersistentToken } from './prompt'
+import type { ParsedArgs, RenderContext } from './types'
 import {
   resolveProfile,
   resolveProfilePath,
@@ -35,24 +37,26 @@ async function runCli(argv: string[]): Promise<void> {
 
   if (args.command === 'login') {
     try {
-      const profilePath = resolveProfilePath(args)
-      const tokenState = await resolveRefreshTokenForStore(args)
+      const loginArgs = await withPromptedLoginToken(args, context)
+      const profilePath = resolveProfilePath(loginArgs)
+      const tokenState = await resolveRefreshTokenForStore(loginArgs)
       await saveProfile(profilePath, tokenState)
       printResult(
         context,
         {
           command: 'login',
           data: {
-            profile: getProfileLabel(args),
+            profile: getProfileLabel(loginArgs),
             profilePath,
           },
         },
-        getProfileLabel(args),
+        getProfileLabel(loginArgs),
       )
       return
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       printError(context, message)
+      return
     }
   }
 
@@ -89,4 +93,38 @@ async function runCli(argv: string[]): Promise<void> {
     const message = error instanceof Error ? error.message : String(error)
     printError(context, message)
   }
+}
+
+async function withPromptedLoginToken(
+  args: ParsedArgs,
+  context: RenderContext,
+): Promise<ParsedArgs> {
+  if (args.command !== 'login' || args.commandArgs.length > 0) {
+    return args
+  }
+
+  if (
+    hasToken(args.estsAuthPersistent) ||
+    hasToken(args.refreshToken) ||
+    hasToken(process.env.ESTSAUTHPERSISTENT) ||
+    hasToken(process.env.REFRESH_TOKEN)
+  ) {
+    return args
+  }
+
+  const canPrompt =
+    process.stdin.isTTY === true && process.stdout.isTTY === true && context.machine === false
+  if (!canPrompt) {
+    return args
+  }
+
+  const estsAuthPersistent = await promptEstsAuthPersistentToken()
+  return {
+    ...args,
+    estsAuthPersistent,
+  }
+}
+
+function hasToken(value: string | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0
 }

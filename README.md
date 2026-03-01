@@ -52,6 +52,12 @@ teams login --ests-auth-persistent=<ESTSAUTHPERSISTENT>
 
 - Default profile path: `~/.teams-cli/default.json`
 - You can change the profile with `--profile`
+- Running `teams login` with no token now prompts for `ESTSAUTHPERSISTENT` in interactive terminals
+- How to obtain `ESTSAUTHPERSISTENT`:
+  1. Use a browser other than Microsoft Edge
+  2. Open `https://login.microsoftonline.com/common/oauth2/v2.0/authorize` in your browser
+  3. Open DevTools, go to the `Application` tab, then `Cookies`
+  4. Copy the `ESTSAUTHPERSISTENT` cookie value and paste it into the `teams login` prompt
 - You can also pass token via `--ests-auth-persistent` or `ESTSAUTHPERSISTENT`
 - The default profile stores `refreshToken`, `refreshTokenExpiresIn`, and `ESTSAUTHPERSISTENT`.
 

@@ -188,8 +188,8 @@ function shouldRefreshByExpiration(
   return expiresAt - 5 * 60 * 1000 <= now
 }
 
-function normalizeToken(value: string | undefined): string | undefined {
-  if (value === undefined) {
+function normalizeToken(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
     return undefined
   }
   const trimmed = value.trim()

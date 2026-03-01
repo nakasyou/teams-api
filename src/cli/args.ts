@@ -1,3 +1,4 @@
+import { parseArgs as parseNodeArgs } from 'node:util'
 import type { CommandName, ParsedArgs } from './types'
 import { DEFAULT_MESSAGE_LIMIT, DEFAULT_PROFILE_NAME } from './constants'
 
@@ -5,6 +6,20 @@ export type LimitOptions = {
   limit: number
   rest: string[]
 }
+
+const GLOBAL_OPTION_CONFIG = {
+  help: { type: 'boolean', short: 'h' },
+  json: { type: 'boolean' },
+  'no-color': { type: 'boolean' },
+  profile: { type: 'string' },
+  'profile-json': { type: 'string' },
+  'refresh-token': { type: 'string' },
+  'ests-auth-persistent': { type: 'string' },
+} as const
+
+const LIMIT_OPTION_CONFIG = {
+  limit: { type: 'string' },
+} as const
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const parsed: ParsedArgs = {
@@ -20,80 +35,71 @@ export function parseArgs(argv: string[]): ParsedArgs {
     showHelp: false,
   }
 
-  let index = 0
-  while (index < argv.length) {
-    const token = argv[index]
-    if (!token.startsWith('-')) {
+  const tokenized = parseNodeArgs({
+    args: argv,
+    options: GLOBAL_OPTION_CONFIG,
+    allowPositionals: true,
+    strict: false,
+    tokens: true,
+  })
+
+  let commandIndex = -1
+  for (const token of tokenized.tokens) {
+    if (token.kind === 'positional') {
+      commandIndex = token.index
       break
     }
 
-    if (token === '--help' || token === '-h') {
+    if (token.kind === 'option-terminator') {
+      throw new Error(`Unknown option: ${rawToken(argv, token.index, '--')}`)
+    }
+
+    const input = rawToken(argv, token.index, token.rawName)
+    if (token.name === 'help') {
       parsed.showHelp = true
-      index += 1
       continue
     }
-
-    if (token === '--json') {
+    if (token.name === 'json') {
       parsed.jsonOutput = true
-      index += 1
       continue
     }
-
-    if (token === '--no-color') {
+    if (token.name === 'no-color') {
       parsed.noColor = true
-      index += 1
       continue
     }
-
-    if (token === '--profile' || token.startsWith('--profile=')) {
-      const value = token === '--profile' ? argv[index + 1] : token.slice('--profile='.length)
-      if (!value) {
+    if (token.name === 'profile') {
+      if (typeof token.value !== 'string' || token.value.length === 0) {
         throw new Error('Missing --profile value')
       }
-      parsed.profileName = value
-      index += token === '--profile' ? 2 : 1
+      parsed.profileName = token.value
       continue
     }
-
-    if (token === '--profile-json' || token.startsWith('--profile-json=')) {
-      const value =
-        token === '--profile-json' ? argv[index + 1] : token.slice('--profile-json='.length)
-      if (!value) {
+    if (token.name === 'profile-json') {
+      if (typeof token.value !== 'string' || token.value.length === 0) {
         throw new Error('Missing --profile-json path')
       }
-      parsed.profileJsonPath = value
-      index += token === '--profile-json' ? 2 : 1
+      parsed.profileJsonPath = token.value
       continue
     }
-
-    if (token === '--refresh-token' || token.startsWith('--refresh-token=')) {
-      const value =
-        token === '--refresh-token' ? argv[index + 1] : token.slice('--refresh-token='.length)
-      if (!value) {
+    if (token.name === 'refresh-token') {
+      if (typeof token.value !== 'string' || token.value.length === 0) {
         throw new Error('Missing --refresh-token value')
       }
-      parsed.refreshToken = value
-      index += token === '--refresh-token' ? 2 : 1
+      parsed.refreshToken = token.value
       continue
     }
-
-    if (token === '--ests-auth-persistent' || token.startsWith('--ests-auth-persistent=')) {
-      const value =
-        token === '--ests-auth-persistent'
-          ? argv[index + 1]
-          : token.slice('--ests-auth-persistent='.length)
-      if (!value) {
+    if (token.name === 'ests-auth-persistent') {
+      if (typeof token.value !== 'string' || token.value.length === 0) {
         throw new Error('Missing --ests-auth-persistent value')
       }
-      parsed.estsAuthPersistent = value
-      index += token === '--ests-auth-persistent' ? 2 : 1
+      parsed.estsAuthPersistent = token.value
       continue
     }
 
-    throw new Error(`Unknown option: ${token}`)
+    throw new Error(`Unknown option: ${input}`)
   }
 
-  const commandArg = argv[index]
+  const commandArg = commandIndex >= 0 ? argv[commandIndex] : undefined
   if (!commandArg) {
     parsed.hasCommand = false
     parsed.commandArgs = []
@@ -106,7 +112,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   parsed.command = parseCommand(commandArg)
   parsed.hasCommand = true
-  parsed.commandArgs = argv.slice(index + 1)
+  parsed.commandArgs = argv.slice(commandIndex + 1)
   return parsed
 }
 
@@ -126,14 +132,34 @@ function parseCommand(input: string): CommandName {
 }
 
 export function parseLimitArgs(args: string[], command: string): LimitOptions {
+  const tokenized = parseNodeArgs({
+    args,
+    options: LIMIT_OPTION_CONFIG,
+    allowPositionals: true,
+    strict: false,
+    tokens: true,
+  })
+
   const rest: string[] = []
   let limit = DEFAULT_MESSAGE_LIMIT
 
-  for (let index = 0; index < args.length; index++) {
-    const token = args[index]
-    if (token === '--limit') {
-      const value = args[index + 1]
-      if (!value || value.startsWith('--')) {
+  for (const token of tokenized.tokens) {
+    if (token.kind === 'positional') {
+      rest.push(token.value)
+      continue
+    }
+
+    if (token.kind === 'option-terminator') {
+      throw new Error(`Unknown option: ${rawToken(args, token.index, '--')}`)
+    }
+
+    if (token.name === 'limit') {
+      const value = token.value
+      if (
+        typeof value !== 'string' ||
+        value.length === 0 ||
+        (token.inlineValue === false && value.startsWith('--'))
+      ) {
         throw new Error(`--limit requires a number for command: teams ${command}`)
       }
       const parsed = Number.parseInt(value, 10)
@@ -141,23 +167,15 @@ export function parseLimitArgs(args: string[], command: string): LimitOptions {
         throw new Error(`--limit requires a positive integer for command: teams ${command}`)
       }
       limit = parsed
-      index += 1
       continue
     }
-    if (token.startsWith('--limit=')) {
-      const value = token.slice('--limit='.length)
-      const parsed = Number.parseInt(value, 10)
-      if (Number.isNaN(parsed) || parsed <= 0) {
-        throw new Error(`--limit requires a positive integer for command: teams ${command}`)
-      }
-      limit = parsed
-      continue
-    }
-    if (token.startsWith('-')) {
-      throw new Error(`Unknown option: ${token}`)
-    }
-    rest.push(token)
+
+    throw new Error(`Unknown option: ${rawToken(args, token.index, token.rawName)}`)
   }
 
   return { limit, rest }
+}
+
+function rawToken(argv: string[], index: number, fallback: string): string {
+  return argv[index] ?? fallback
 }

@@ -84,7 +84,11 @@ export async function executeCommand(
             if (teamIds.length > 1) {
               throw new Error(`Ambiguous channel: ${channelId} exists in multiple teams`)
             }
-            return client.teams.channels.fetchMessages(teamIds[0], channelId, {
+            const [teamId] = teamIds
+            if (!teamId) {
+              throw new Error(`Channel not found: ${channelId}`)
+            }
+            return client.teams.channels.fetchMessages(teamId, channelId, {
               pageSize: parsed.limit,
             })
           },
@@ -173,6 +177,10 @@ export async function executeCommand(
     }
     case 'login':
       throw new Error('login is a profile-only command')
+    case 'list':
+    case 'channels':
+    case 'channel-messages':
+      throw new Error(`Unexpected top-level command: ${args.command}`)
     case 'help':
       return { command: 'help', data: undefined }
   }

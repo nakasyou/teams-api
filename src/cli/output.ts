@@ -73,9 +73,9 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
 
   if (command === 'login') {
     console.log('Usage:')
-    console.log('  teams login --ests-auth-persistent=<token> [options] (recommended)')
+    console.log('  teams login [--ests-auth-persistent=<token>] [options] (recommended)')
     console.log('  teams login --refresh-token=<token> [options] (deprecated)')
-    console.log('  Save refresh token to the selected profile')
+    console.log('  Save refresh token to the selected profile (interactive prompt available)')
     return
   }
 
@@ -126,7 +126,7 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  teams list                          List all teams for the current user')
     console.log('  teams channels <teamId>             List channels in a team')
     console.log('  me                                  Fetch current user snapshot')
-    console.log('  login --ests-auth-persistent=<token> Save session token to selected profile')
+    console.log('  login [--ests-auth-persistent=<token>] Save session token to selected profile')
   }
 }
 
