@@ -12,3 +12,5 @@ export {
   type TeamsUsersMeAPI,
 } from './client'
 export * from './types'
+export { TeamsFilesAPI } from './rest/routes/files'
+export { TeamsNotebooksAPI, TeamsClassNotebooksAPI } from './rest/routes/notebooks'

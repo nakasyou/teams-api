@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { fileURLToPath } from 'node:url'
+import { parseArgs as parseNodeArgs } from 'node:util'
 import { TeamsClient } from '../client'
 import { TokenManager } from '../auth/TokenManager'
 import { loginFromEstsAuthPersistent } from '../auth/estsAuth'
@@ -24,6 +26,34 @@ async function runCli(argv: string[]): Promise<void> {
     noColor: args.noColor,
   })
 
+  if (args.command === 'mcp') {
+    try {
+      const { values } = parseNodeArgs({
+        args: args.commandArgs,
+        options: {
+          help: { type: 'boolean', short: 'h' },
+          profile: { type: 'string' },
+          'profile-json': { type: 'string' },
+        },
+      })
+      if (args.showHelp || values.help) {
+        printHelp(context, 'mcp')
+        return
+      }
+      const baseArgs = ['--profile', values.profile ?? args.profileName]
+      const profileJson = values['profile-json'] ?? args.profileJsonPath
+      if (profileJson) baseArgs.push('--profile-json', profileJson)
+      if (args.estsAuthPersistent) baseArgs.push('--ests-auth-persistent', args.estsAuthPersistent)
+      if (args.refreshToken) baseArgs.push('--refresh-token', args.refreshToken)
+      const { startTeamsMcpServer } = await import('../mcp/start')
+      await startTeamsMcpServer(fileURLToPath(import.meta.url), baseArgs)
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error))
+      process.exitCode = 1
+    }
+    return
+  }
+
   if (args.showHelp || args.command === 'help') {
     printHelp(context)
     return
@@ -32,6 +62,18 @@ async function runCli(argv: string[]): Promise<void> {
   if (!args.hasCommand) {
     printHelp(context)
     process.exitCode = 1
+    return
+  }
+
+  if (
+    (args.command === 'files' ||
+      args.command === 'notebooks' ||
+      args.command === 'class-notebook') &&
+    (!args.commandArgs.length ||
+      args.commandArgs.includes('--help') ||
+      args.commandArgs.includes('-h'))
+  ) {
+    printHelp(context, args.command)
     return
   }
 

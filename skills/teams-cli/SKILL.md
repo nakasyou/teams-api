@@ -115,6 +115,42 @@ teams teams channels <teamId>
 teams me
 ```
 
+### Files and notebooks
+
+```bash
+teams files drives <teamId-or-groupId>
+teams files channel <teamId-or-groupId> <channelId>
+teams files list <driveId> [folderItemId]
+teams files download <driveId> <itemId> --output ./file.pdf
+teams files download-folder <driveId> <folderItemId> --output ./downloads
+teams files upload <driveId> <folderItemId> ./file.pdf
+teams files rename <driveId> <itemId> new-name.pdf
+teams files delete <driveId> <itemId>
+teams notebooks list <teamId-or-groupId>
+teams notebooks export <scope> <notebookId> --output ./notebook
+teams notebooks create-page <scope> <sectionId> --input ./page.html
+teams notebooks patch-page <scope> <pageId> --input ./commands.json
+teams class-notebook default <teamId-or-groupId>
+teams class-notebook export <teamId-or-groupId> --output ./class-notebook
+```
+
+- Use `teams files --help`, `teams notebooks --help`, and `teams class-notebook --help` for the complete command lists, including administrative operations.
+- Team thread IDs are resolved to Microsoft 365 group IDs automatically. File operations use drive/item IDs returned by discovery commands.
+- Notebook scopes accept team/group IDs, `me`, `user:<id>`, and `site:<hostname,siteCollectionId,siteId>`.
+- Full notebook export saves page HTML, resources, and `index.json`; OneNote packages are not ordinary downloadable files.
+- Downloads refuse to overwrite existing local files. Uploads default to conflict failure; use `--conflict replace` or `rename` explicitly.
+- Match mutations to the user's requested scope. File deletion, notebook page deletion, and Class Notebook membership changes modify remote data.
+- Class-specific list/administration endpoints can return 403 when permissions are unavailable. The default notebook and ordinary notebook APIs may remain readable.
+
+### MCP server
+
+- Start `teams mcp` (alias: `teams-mcp`; from source: `bun run teams -- mcp`) for stdio MCP access.
+- The server exposes exactly one `teams` tool. Its description documents the complete command set.
+- Pass literal CLI arguments in `args`, excluding the executable name: `{"args":["files","list","drive-id"]}`.
+- Put global profile options before the subcommand. The existing CLI profiles and authentication environment variables are reused.
+- Tool results include the CLI output, exit code, stderr, and parsed JSON when available. Nonzero exits are tool errors.
+- Download/upload/input paths refer to the MCP server machine and working directory.
+
 ## 4) Output Modes and Automation Guidance
 
 ### JSON mode (recommended for scripts/LLMs)

@@ -119,6 +119,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
 function parseCommand(input: string): CommandName {
   if (
     input === 'notifications' ||
+    input === 'mcp' ||
+    input === 'files' ||
+    input === 'notebooks' ||
+    input === 'class-notebook' ||
     input === 'messages' ||
     input === 'channel' ||
     input === 'me' ||

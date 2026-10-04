@@ -1,4 +1,8 @@
 export type CommandName =
+  | 'mcp'
+  | 'files'
+  | 'notebooks'
+  | 'class-notebook'
   | 'notifications'
   | 'messages'
   | 'channel'

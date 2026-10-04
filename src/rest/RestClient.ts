@@ -9,8 +9,9 @@ export type RestRequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   query?: URLSearchParams | QueryParams
   headers?: Record<string, string>
-  body?: string | URLSearchParams
+  body?: string | URLSearchParams | Blob | FormData
   referrer?: string
+  redirect?: 'error' | 'follow' | 'manual'
 }
 
 const appendQuery = (url: string, query?: URLSearchParams | QueryParams): string => {
@@ -48,6 +49,14 @@ export class RestClient {
   }
 
   async request<T>(url: string, options: RestRequestOptions): Promise<T> {
+    const res = await this.requestResponse(url, options)
+    if (res.status === 204) {
+      return undefined as T
+    }
+    return (await res.json()) as T
+  }
+
+  async requestResponse(url: string, options: RestRequestOptions): Promise<Response> {
     const token = await this.#tokenProvider.getTokenFromScope(options.scope)
     const headers = new Headers(options.headers)
     headers.set('authorization', `Bearer ${token}`)
@@ -58,12 +67,18 @@ export class RestClient {
       headers,
       referrer: options.referrer ?? this.#referrer,
       body: options.body,
+      redirect: options.redirect ?? 'error',
     })
 
     if (!res.ok) {
-      throw new Error(`Failed request ${method} ${url}: ${res.status} ${res.statusText}`)
+      if (options.redirect === 'manual' && [301, 302, 303, 307, 308].includes(res.status)) {
+        return res
+      }
+      throw new Error(
+        `Failed request ${method} ${new URL(url).pathname}: ${res.status} ${res.statusText}`,
+      )
     }
 
-    return (await res.json()) as T
+    return res
   }
 }

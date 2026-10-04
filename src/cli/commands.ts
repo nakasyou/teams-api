@@ -3,6 +3,7 @@ import type { CliCommandResult, ParsedArgs, RenderContext } from './types'
 import { parseLimitArgs } from './args'
 import { withSpinner } from './output'
 import type { Channel, Team, TeamsExport } from '../types'
+import { executeContentCommand } from './content'
 
 export async function executeCommand(
   args: ParsedArgs,
@@ -12,6 +13,10 @@ export async function executeCommand(
   const animationContext = context
 
   switch (args.command) {
+    case 'files':
+    case 'notebooks':
+    case 'class-notebook':
+      return executeContentCommand(args, client)
     case 'notifications': {
       if (args.commandArgs.includes('--help') || args.commandArgs.includes('-h')) {
         return {
@@ -175,6 +180,8 @@ export async function executeCommand(
       }
       throw new Error(`Unknown teams subcommand: ${subCommand}`)
     }
+    case 'mcp':
+      throw new Error('mcp starts a server and cannot execute as an API command')
     case 'login':
       throw new Error('login is a profile-only command')
     case 'list':

@@ -6,6 +6,6 @@ export default defineConfig({
     singleQuote: true,
   },
   pack: {
-    entry: ['./src/index.ts', 'src/cli/index.ts'],
+    entry: ['./src/index.ts', 'src/cli/index.ts', 'src/mcp/index.ts'],
   },
 })

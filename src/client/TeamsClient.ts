@@ -1,5 +1,7 @@
 import type { ScopeTokenProvider } from '../auth/TokenManager'
 import { RestClient } from '../rest'
+import { TeamsFilesAPI } from '../rest/routes/files'
+import { TeamsNotebooksAPI, TeamsClassNotebooksAPI } from '../rest/routes/notebooks'
 import {
   fetchChannel,
   fetchChannelMessages,
@@ -64,6 +66,9 @@ export interface TeamsUsersAPI {
 }
 
 export interface TeamsClientTeamsAPI {
+  files: TeamsFilesAPI
+  notebooks: TeamsNotebooksAPI
+  classNotebooks: TeamsClassNotebooksAPI
   conversations: TeamsConversationsAPI
   notifications: TeamsNotificationsAPI
   channels: TeamsChannelsAPI
@@ -78,6 +83,9 @@ export class TeamsClient {
     this.rest = new RestClient(tokenProvider)
 
     this.teams = {
+      files: new TeamsFilesAPI(this.rest),
+      notebooks: new TeamsNotebooksAPI(this.rest),
+      classNotebooks: new TeamsClassNotebooksAPI(this.rest),
       conversations: {
         fetchMessages: (conversationId, options) =>
           this.fetchConversationMessages(conversationId, options),

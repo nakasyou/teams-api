@@ -1,6 +1,7 @@
 import type { CliCommandResult, RenderContext } from './types'
 import { ANSI_CODES, SPINNER_FRAMES } from './constants'
 import type { Channel, Team, TeamsExport } from '../types'
+import { contentHelp } from './content'
 
 type Color = keyof typeof ANSI_CODES
 
@@ -40,6 +41,15 @@ export async function withSpinner<T>(
 }
 
 export function printHelp(context: RenderContext, command?: string, compact = false): void {
+  if (command === 'mcp') {
+    console.log('Usage: teams mcp [--profile <name>] [--profile-json <path>]')
+    console.log('Start a stdio MCP server with one teams tool that runs CLI subcommands.')
+    return
+  }
+  if (command === 'files' || command === 'notebooks' || command === 'class-notebook') {
+    console.log(contentHelp[command].join('\n'))
+    return
+  }
   const colorize = (color: Color, text: string) =>
     context.color ? `${ANSI_CODES[color]}${text}${ANSI_CODES.reset}` : text
 
@@ -120,6 +130,10 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  --help, -h               Show this help')
     console.log()
     console.log('Commands:')
+    console.log('  mcp                                 Start the stdio MCP server')
+    console.log('  files <command>                     List, search, and download Teams files')
+    console.log('  notebooks <command>                 Browse and export OneNote notebooks')
+    console.log('  class-notebook <command>             Browse and export Class Notebooks')
     console.log('  notifications [--limit N]           Fetch latest notifications')
     console.log('  messages <conversationId> [--limit N]   Fetch conversation messages')
     console.log('  channel messages <channelId> [--limit N] Fetch channel messages')
@@ -159,6 +173,15 @@ export function printResult(
   }
 
   if (result.command === 'help') {
+    return
+  }
+
+  if (
+    result.command === 'files' ||
+    result.command === 'notebooks' ||
+    result.command === 'class-notebook'
+  ) {
+    console.log(JSON.stringify(result.data, null, 2))
     return
   }
 

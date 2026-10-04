@@ -10,8 +10,9 @@ export async function promptEstsAuthPersistentToken(): Promise<string> {
     process.stdout.write(
       'No login token was provided.\n' +
         'Use a browser other than Microsoft Edge, then open\n' +
-        'https://login.microsoftonline.com/common/oauth2/v2.0/authorize,\n' +
-        'then open DevTools > Application > Cookies, copy ESTSAUTHPERSISTENT, and paste it below.\n',
+        'https://login.microsoftonline.com/common/oauth2/v2.0/authorize.\n' +
+        'Even if a warning or sign-in error appears, continue to DevTools > Application > Cookies,\n' +
+        'copy ESTSAUTHPERSISTENT, and paste it below.\n',
     )
     const input = await reader.question('ESTSAUTHPERSISTENT: ')
     const token = input.trim()
