@@ -103,20 +103,27 @@ async function runCli(argv: string[]): Promise<void> {
   }
 
   try {
-    const { token, profilePath, profileLabel, refreshTokenExpiresIn, ESTSAUTHPERSISTENT } =
-      await resolveProfile(args)
+    const {
+      token,
+      tenantId,
+      profilePath,
+      profileLabel,
+      refreshTokenExpiresIn,
+      ESTSAUTHPERSISTENT,
+    } = await resolveProfile(args)
     const tokenManager = new TokenManager(
       token,
       refreshTokenExpiresIn,
       ESTSAUTHPERSISTENT
         ? async () => {
-            const tokenRes = await loginFromEstsAuthPersistent(ESTSAUTHPERSISTENT)
+            const tokenRes = await loginFromEstsAuthPersistent(ESTSAUTHPERSISTENT, tenantId)
             return {
               refresh_token: tokenRes.refresh_token,
               refresh_token_expires_in: tokenRes.refresh_token_expires_in,
             }
           }
         : undefined,
+      tenantId,
     )
     const client = new TeamsClient(tokenManager)
     const result = await executeCommand(args, client, context)
@@ -125,6 +132,7 @@ async function runCli(argv: string[]): Promise<void> {
       return
     }
     const profileState = {
+      tenantId,
       refreshToken: tokenManager.getRefreshToken(),
       refreshTokenExpiresIn: tokenManager.getRefreshTokenExpiresIn(),
       ESTSAUTHPERSISTENT,

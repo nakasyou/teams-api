@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import type { ParsedArgs, ResolvedProfile } from './types'
 import { DEFAULT_PROFILE_DIR, DEFAULT_PROFILE_NAME } from './constants'
 import { loginFromEstsAuthPersistent } from '../auth/estsAuth'
+import { resolveTenantId } from '../auth/tenant'
 
 const PROFILE_KEY_REFRESH_TOKEN = 'refreshToken'
 const PROFILE_KEY_REFRESH_TOKEN_EXPIRES_IN = 'refreshTokenExpiresIn'
@@ -10,6 +11,7 @@ const PROFILE_KEY_ESTSAUTHPERSISTENT = 'ESTSAUTHPERSISTENT'
 const PROFILE_KEY_UPDATED_AT = 'updatedAt'
 
 type ProfileState = {
+  tenantId?: string
   refreshToken?: string
   refreshTokenExpiresIn?: number
   ESTSAUTHPERSISTENT?: string
@@ -17,6 +19,7 @@ type ProfileState = {
 }
 
 type ProfileFile = {
+  tenantId?: unknown
   [PROFILE_KEY_REFRESH_TOKEN]?: unknown
   [PROFILE_KEY_REFRESH_TOKEN_EXPIRES_IN]?: unknown
   [PROFILE_KEY_ESTSAUTHPERSISTENT]?: unknown
@@ -74,6 +77,7 @@ export async function resolveProfile(args: ParsedArgs): Promise<ResolvedProfile>
   const profilePath = resolveProfilePath(args)
   const profileLabel = getProfileLabel(args)
   const storedProfile = await loadProfileState(profilePath)
+  const tenantId = resolveTenantId(storedProfile.tenantId)
 
   const estsAuthPersistent = firstDefinedToken(
     args.estsAuthPersistent,
@@ -82,8 +86,9 @@ export async function resolveProfile(args: ParsedArgs): Promise<ResolvedProfile>
   )
 
   if (estsAuthPersistent) {
-    const tokenRes = await refreshFromPersistentToken(estsAuthPersistent)
+    const tokenRes = await refreshFromPersistentToken(estsAuthPersistent, tenantId)
     return {
+      tenantId,
       token: tokenRes.refresh_token,
       profilePath,
       profileLabel,
@@ -111,8 +116,9 @@ export async function resolveProfile(args: ParsedArgs): Promise<ResolvedProfile>
   )
 
   if (isRefreshTokenExpired && estsAuthPersistent) {
-    const tokenRes = await refreshFromPersistentToken(estsAuthPersistent)
+    const tokenRes = await refreshFromPersistentToken(estsAuthPersistent, tenantId)
     return {
+      tenantId,
       token: tokenRes.refresh_token,
       profilePath,
       profileLabel,
@@ -124,6 +130,7 @@ export async function resolveProfile(args: ParsedArgs): Promise<ResolvedProfile>
   }
 
   return {
+    tenantId,
     token: legacyRefreshToken,
     profilePath,
     profileLabel,
@@ -135,13 +142,16 @@ export async function resolveProfile(args: ParsedArgs): Promise<ResolvedProfile>
 }
 
 export async function resolveRefreshTokenForStore(args: ParsedArgs): Promise<ProfileState> {
+  const storedProfile = await loadProfileState(resolveProfilePath(args))
+  const tenantId = resolveTenantId(args.tenantId ?? storedProfile.tenantId)
   const estsAuthPersistent = firstDefinedToken(
     args.estsAuthPersistent,
     process.env.ESTSAUTHPERSISTENT,
   )
   if (estsAuthPersistent) {
-    const tokenRes = await refreshFromPersistentToken(estsAuthPersistent)
+    const tokenRes = await refreshFromPersistentToken(estsAuthPersistent, tenantId)
     return {
+      tenantId,
       refreshToken: tokenRes.refresh_token,
       refreshTokenExpiresIn: tokenRes.refresh_token_expires_in,
       ESTSAUTHPERSISTENT: estsAuthPersistent,
@@ -155,14 +165,16 @@ export async function resolveRefreshTokenForStore(args: ParsedArgs): Promise<Pro
     )
   }
   return {
+    tenantId,
     refreshToken,
   }
 }
 
 async function refreshFromPersistentToken(
   estsAuthPersistent: string,
+  tenantId: string,
 ): Promise<LoginFromEstsAuthPersistentResponse> {
-  return loginFromEstsAuthPersistent(estsAuthPersistent)
+  return loginFromEstsAuthPersistent(estsAuthPersistent, tenantId)
 }
 
 function firstDefinedToken(...tokens: Array<string | undefined>): string | undefined {
@@ -216,6 +228,7 @@ function normalizeUpdatedAt(value: unknown): number | undefined {
 
 function asProfileState(raw: ProfileFile): ProfileState {
   return {
+    tenantId: normalizeToken(raw.tenantId),
     refreshToken: normalizeToken(raw[PROFILE_KEY_REFRESH_TOKEN]),
     refreshTokenExpiresIn: normalizeExpiresIn(raw[PROFILE_KEY_REFRESH_TOKEN_EXPIRES_IN]),
     ESTSAUTHPERSISTENT: normalizeToken(raw[PROFILE_KEY_ESTSAUTHPERSISTENT]),
@@ -225,6 +238,7 @@ function asProfileState(raw: ProfileFile): ProfileState {
 
 function toProfileFile(state: ProfileState): ProfileFile {
   const payload: ProfileFile = {}
+  if (state.tenantId) payload.tenantId = resolveTenantId(state.tenantId)
   if (state.refreshToken) {
     payload[PROFILE_KEY_REFRESH_TOKEN] = state.refreshToken
   }

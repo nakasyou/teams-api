@@ -14,3 +14,5 @@ export {
 export * from './types'
 export { TeamsFilesAPI } from './rest/routes/files'
 export { TeamsNotebooksAPI, TeamsClassNotebooksAPI } from './rest/routes/notebooks'
+
+export { DEFAULT_TENANT_ID, resolveTenantId } from './auth/tenant'

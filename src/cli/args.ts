@@ -113,6 +113,25 @@ export function parseArgs(argv: string[]): ParsedArgs {
   parsed.command = parseCommand(commandArg)
   parsed.hasCommand = true
   parsed.commandArgs = argv.slice(commandIndex + 1)
+  if (parsed.command === 'login') {
+    const { values } = parseNodeArgs({
+      args: parsed.commandArgs,
+      options: {
+        'tenant-id': { type: 'string' },
+        'ests-auth-persistent': { type: 'string' },
+        'refresh-token': { type: 'string' },
+        help: { type: 'boolean', short: 'h' },
+      },
+    })
+    if (values['tenant-id'] !== undefined) {
+      if (!values['tenant-id'].trim()) throw new Error('Missing --tenant-id value')
+      parsed.tenantId = values['tenant-id']
+    }
+    parsed.estsAuthPersistent = values['ests-auth-persistent'] ?? parsed.estsAuthPersistent
+    parsed.refreshToken = values['refresh-token'] ?? parsed.refreshToken
+    parsed.showHelp = values.help ?? parsed.showHelp
+    parsed.commandArgs = []
+  }
   return parsed
 }
 

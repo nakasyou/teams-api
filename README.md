@@ -271,3 +271,21 @@ The package uses Vite+ to build both library and CLI entry points.
 ## License
 
 MIT
+
+### Tenant selection
+
+Specify a tenant UUID or domain at login. The selected tenant is saved as `tenantId`
+in the profile JSON; subsequent API calls and MCP tools read it from that profile.
+
+```sh
+teams login --tenant-id <tenant-id-or-domain>
+teams me --json
+teams mcp
+```
+
+Use `teams --profile school login --tenant-id <tenant-id-or-domain>` for a separate profile.
+Existing profiles without `tenantId` default to `organizations`; no school-specific
+tenant ID is embedded in the package. Login without `--tenant-id` retains the
+profile's existing tenant, or uses `organizations` for a new profile.
+For library use, pass the tenant as the fourth `TokenManager` constructor argument:
+`new TokenManager(refreshToken, undefined, undefined, tenantId)`.

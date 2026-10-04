@@ -140,7 +140,9 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  teams list                          List all teams for the current user')
     console.log('  teams channels <teamId>             List channels in a team')
     console.log('  me                                  Fetch current user snapshot')
-    console.log('  login [--ests-auth-persistent=<token>] Save session token to selected profile')
+    console.log(
+      '  login [--tenant-id=<id>] [--ests-auth-persistent=<token>] Save tenant and session token',
+    )
   }
 }
 

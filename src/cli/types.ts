@@ -18,6 +18,7 @@ export type ParsedArgs = {
   command: CommandName
   hasCommand: boolean
   commandArgs: string[]
+  tenantId?: string
   profileName: string
   profileJsonPath: string | undefined
   estsAuthPersistent: string | undefined
@@ -38,6 +39,7 @@ export type CliCommandResult = {
 }
 
 export type ResolvedProfile = {
+  tenantId: string
   token: string
   profilePath: string
   profileLabel: string

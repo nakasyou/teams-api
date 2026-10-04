@@ -1,3 +1,5 @@
+import { resolveTenantId, tenantOAuthUrl } from './tenant'
+
 export interface ScopeTokenProvider {
   getTokenFromScope(scope: string): Promise<string>
 }
@@ -20,6 +22,7 @@ type OAuthRefreshTokenResponse = {
 }
 
 export class TokenManager implements ScopeTokenProvider {
+  #tenantId: string
   #refresh: string
   #refreshTokenExpiresIn: number | undefined
   #refreshTokenProvider: RefreshTokenProvider | undefined
@@ -29,7 +32,9 @@ export class TokenManager implements ScopeTokenProvider {
     refreshToken: string,
     refreshTokenExpiresIn?: number,
     refreshTokenProvider?: RefreshTokenProvider,
+    tenantId?: string,
   ) {
+    this.#tenantId = resolveTenantId(tenantId)
     this.#refresh = refreshToken
     this.#refreshTokenExpiresIn = refreshTokenExpiresIn
     this.#refreshTokenProvider = refreshTokenProvider
@@ -68,21 +73,18 @@ export class TokenManager implements ScopeTokenProvider {
       formData.append('x-client-last-telemetry', '5|0|||0,0')
       formData.append('refresh_token', this.#refresh)
 
-      const newToken = await fetch(
-        'https://login.microsoftonline.com/83d9219c-a57d-4d58-b3e5-4abef53925a2/oauth2/v2.0/token?client-request-id=Core-5e01fb3c-a48b-44c9-83fa-2aa7be8fd4e3',
-        {
-          headers: {
-            'content-type': 'application/x-www-form-urlencoded;charset=utf-8',
-            origin: 'https://teams.cloud.microsoft',
-            referer: 'https://teams.cloud.microsoft/',
-          },
-          referrer: 'https://teams.cloud.microsoft/',
-          body: formData.toString(),
-          method: 'POST',
-          mode: 'cors',
-          credentials: 'include',
+      const newToken = await fetch(tenantOAuthUrl('token', this.#tenantId), {
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded;charset=utf-8',
+          origin: 'https://teams.cloud.microsoft',
+          referer: 'https://teams.cloud.microsoft/',
         },
-      )
+        referrer: 'https://teams.cloud.microsoft/',
+        body: formData.toString(),
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'include',
+      })
 
       if (!newToken.ok) {
         const tokenError = (await safeParseJson(newToken)) as OAuthRefreshTokenError | undefined

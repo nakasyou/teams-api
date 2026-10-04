@@ -1,3 +1,5 @@
+import { resolveTenantId, tenantOAuthUrl } from './tenant'
+
 type LoginFromEstsAuthResponse = {
   refresh_token: string
   refresh_token_expires_in: number
@@ -46,7 +48,9 @@ function normalizeCookie(value: string): string {
 
 export async function loginFromEstsAuthPersistent(
   ESTSAUTHPERSISTENT: string,
+  tenantId?: string,
 ): Promise<LoginFromEstsAuthResponse> {
+  const resolvedTenantId = resolveTenantId(tenantId)
   const authCookie = normalizeCookie(ESTSAUTHPERSISTENT)
   if (!authCookie) {
     throw new Error('ESTSAUTHPERSISTENT must be a non-empty string')
@@ -62,9 +66,7 @@ export async function loginFromEstsAuthPersistent(
   const codeVerifier = createCodeVerifier()
   const codeChallenge = await createCodeChallenge(codeVerifier)
 
-  const authorizeURL = new URL(
-    'https://login.microsoftonline.com/83d9219c-a57d-4d58-b3e5-4abef53925a2/oauth2/v2.0/authorize',
-  )
+  const authorizeURL = new URL(tenantOAuthUrl('authorize', resolvedTenantId))
   const authorizeParams = new URLSearchParams()
   authorizeParams.set('client_id', '5e3ce6c0-2b1f-4285-8d4b-75ee78787346')
   authorizeParams.set(
@@ -124,18 +126,15 @@ export async function loginFromEstsAuthPersistent(
   tokenFormData.set('client_info', '1')
 
   const tokenRes = (await (
-    await fetch(
-      'https://login.microsoftonline.com/common/oauth2/v2.0/token?client-request-id=Core-713ccf6c-567d-48bd-be19-b4bc98f1e025',
-      {
-        headers: {
-          Referer: 'https://teams.cloud.microsoft/',
-          Origin: 'https://teams.cloud.microsoft',
-          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        },
-        body: tokenFormData.toString(),
-        method: 'POST',
+    await fetch(tenantOAuthUrl('token', resolvedTenantId), {
+      headers: {
+        Referer: 'https://teams.cloud.microsoft/',
+        Origin: 'https://teams.cloud.microsoft',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
       },
-    )
+      body: tokenFormData.toString(),
+      method: 'POST',
+    })
   ).json()) as Promise<LoginFromEstsAuthResponse>
 
   return tokenRes

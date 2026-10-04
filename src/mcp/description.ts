@@ -15,7 +15,7 @@ const basicCommands = [
   ['teams teams channels <teamId>', 'List the channels belonging to a Teams thread ID.'],
   ['teams me', 'Fetch the current user snapshot, including teams and chats.'],
   [
-    'teams login [--ests-auth-persistent <cookie> | --refresh-token <token>]',
+    'teams login [--tenant-id <id>] [--ests-auth-persistent <cookie> | --refresh-token <token>]',
     'Store credentials in the selected profile. The session cookie is preferred; refresh-token is deprecated. MCP is noninteractive, so provide credentials in arguments or environment variables.',
   ],
   ['teams --help', 'Show the top-level CLI help without authentication.'],
@@ -133,7 +133,7 @@ export const teamsToolDescription = [
   'Run one Microsoft Teams CLI command and return its result. This is the only tool exposed by this MCP server.',
   'Input args is an argv array, excluding the executable name teams. Do not pass a shell command or shell quoting; each argument is one array element. Example: {"args":["files","list","drive-id"]}.',
   'The CLI runs with --json --no-color. Returns exitCode, stdout, stderr, and result when stdout is JSON. A nonzero exit code is an MCP tool error. Help returns text. Downloads/exports write to the server machine; paths and local --input/attachment files are resolved relative to the server working directory.',
-  'Authentication uses the existing ~/.teams-cli/default.json profile or the configured server profile. Global options go BEFORE the subcommand: --profile <name>, --profile-json <path>, --ests-auth-persistent <cookie>, --refresh-token <token> (deprecated), --json, --no-color, --help/-h. ESTSAUTHPERSISTENT and REFRESH_TOKEN environment variables are supported. Normal API calls may update stored refresh credentials.',
+  'Authentication uses the existing ~/.teams-cli/default.json profile or the configured server profile. Global options go BEFORE the subcommand: --profile <name>, --profile-json <path>, --ests-auth-persistent <cookie>, --refresh-token <token> (deprecated), --json, --no-color, --help/-h. ESTSAUTHPERSISTENT and REFRESH_TOKEN environment variables are supported. Configure tenant with teams login --tenant-id <id>; subsequent commands read tenantId from profile JSON (default: organizations). Normal API calls may update stored refresh credentials.',
   'Team thread IDs (19:...) are resolved to Microsoft 365 group IDs. File drive/item IDs come from discovery commands. Notebook scope accepts teamId, groupId, me, user:<userId>, or site:<hostname,siteCollectionId,siteId>. SharePoint library/folder paths are server-relative. Classroom administration requires teacher/owner permissions. Mutation commands modify server data when invoked.',
   'All supported commands (syntax followed by explanation):',
   ...[...basicCommands, ...contentCommands].map(
