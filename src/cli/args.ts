@@ -144,6 +144,10 @@ function parseCommand(input: string): CommandName {
     input === 'class-notebook' ||
     input === 'messages' ||
     input === 'channel' ||
+    input === 'send' ||
+    input === 'post' ||
+    input === 'reply' ||
+    input === 'dm' ||
     input === 'me' ||
     input === 'teams' ||
     input === 'login' ||

@@ -1,6 +1,8 @@
 export const TEAMS_WORKER_REFERRER =
   'https://teams.cloud.microsoft/v2/worker/precompiled-web-worker-8e61d59c0abedf86.js'
 
+export const CHATSVC_BASE = 'https://teams.cloud.microsoft/api/chatsvc/jp/'
+
 export const SCOPES = {
   graph: 'https://graph.microsoft.com/.default openid profile offline_access',
   notes: 'https://www.onenote.com/.default openid profile offline_access',

@@ -11,6 +11,22 @@ const basicCommands = [
     'teams channel messages <channelId> [--limit N]',
     'Resolve the owning team and fetch channel messages.',
   ],
+  [
+    'teams send <conversationId> <text> [--input <file>] [--html] [--text] [--subject <title>] [--importance standard|high|urgent]',
+    'Send a message to a DM, group chat, or channel conversation. Plain text is escaped and wrapped in <p>; --html sends raw HTML. Mutates server data.',
+  ],
+  [
+    'teams post <teamId> <channelId> <text> [--subject <title>] [--input <file>] [--html] [--text]',
+    'Create a top-level channel post. The channel ID is the conversation ID; the title goes in properties.subject. Mutates server data.',
+  ],
+  [
+    'teams reply <teamId> <channelId> <rootMessageId> <text> [--input <file>] [--html] [--text]',
+    'Reply to a channel post using the encoded <channelId>;messageid=<rootMessageId> conversation ID. Mutates server data.',
+  ],
+  [
+    'teams dm <userMri> <text> [--self-mri <mri>] [--topic <name>] [--new-chat] [--input <file>] [--html] [--text]',
+    'Send a direct message, reusing an existing 1:1 chat when found or creating one. Pass --self-mri when your MRI cannot be derived. Mutates server data.',
+  ],
   ['teams teams list', 'List joined teams, including their thread IDs.'],
   ['teams teams channels <teamId>', 'List the channels belonging to a Teams thread ID.'],
   ['teams me', 'Fetch the current user snapshot, including teams and chats.'],
@@ -142,5 +158,6 @@ export const teamsToolDescription = [
   'teams files --help\n  Show every file command without authentication.',
   'teams notebooks --help\n  Show every notebook command without authentication.',
   'teams class-notebook --help\n  Show every Class Notebook command without authentication.',
-  'For notifications/messages/channel/me/teams/login, --help or -h also displays command-specific help; existing CLI authentication behavior applies.',
+  'For notifications/messages/channel/me/teams/login/send/post/reply/dm, --help or -h also displays command-specific help; existing CLI authentication behavior applies.',
+  'teams send/post/reply/dm write to Teams immediately. Only call them when the user explicitly intends to send a message, post, reply, or DM.',
 ].join('\n\n')

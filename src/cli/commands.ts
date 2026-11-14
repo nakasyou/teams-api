@@ -4,6 +4,7 @@ import { parseLimitArgs } from './args'
 import { withSpinner } from './output'
 import type { Channel, Team, TeamsExport } from '../types'
 import { executeContentCommand } from './content'
+import { executeMessageCommand } from './messages'
 
 export async function executeCommand(
   args: ParsedArgs,
@@ -17,6 +18,11 @@ export async function executeCommand(
     case 'notebooks':
     case 'class-notebook':
       return executeContentCommand(args, client)
+    case 'send':
+    case 'post':
+    case 'reply':
+    case 'dm':
+      return executeMessageCommand(args, client)
     case 'notifications': {
       if (args.commandArgs.includes('--help') || args.commandArgs.includes('-h')) {
         return {

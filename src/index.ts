@@ -5,6 +5,7 @@ export {
   type ChannelQueryOptions,
   type FetchShortProfileOptions,
   type TeamsChannelsAPI,
+  type TeamsChatsAPI,
   type TeamsClientTeamsAPI,
   type TeamsConversationsAPI,
   type TeamsNotificationsAPI,
