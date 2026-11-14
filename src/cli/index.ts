@@ -68,7 +68,11 @@ async function runCli(argv: string[]): Promise<void> {
   if (
     (args.command === 'files' ||
       args.command === 'notebooks' ||
-      args.command === 'class-notebook') &&
+      args.command === 'class-notebook' ||
+      args.command === 'send' ||
+      args.command === 'post' ||
+      args.command === 'reply' ||
+      args.command === 'dm') &&
     (!args.commandArgs.length ||
       args.commandArgs.includes('--help') ||
       args.commandArgs.includes('-h'))

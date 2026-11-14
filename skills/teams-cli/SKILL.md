@@ -102,6 +102,21 @@ teams channel messages <channelId>
 teams channel messages <channelId> --limit 30
 ```
 
+### Send messages, posts, replies, and DMs
+
+```bash
+teams send <conversationId> "Hello"
+teams send <conversationId> --input ./message.html --html
+teams post <teamId> <channelId> "Release notes" --subject "Weekly release notes"
+teams reply <teamId> <channelId> <rootMessageId> "Thanks!"
+teams dm 8:orgid:<user-guid> "Hello" --self-mri 8:orgid:<your-guid>
+```
+
+- Plain text is escaped and wrapped in `<p>`; `--html` sends raw HTML and `--text` sends `messagetype: "Text"`.
+- `--subject` sets a channel post title and `--importance` accepts `standard`, `high`, or `urgent`.
+- `teams dm` reuses an existing 1:1 chat when found and otherwise creates one; pass `--self-mri` if your MRI cannot be derived.
+- These commands write to Teams immediately. Only run them when the user explicitly intends to send a message, post, reply, or DM.
+
 ### Teams and channels
 
 ```bash

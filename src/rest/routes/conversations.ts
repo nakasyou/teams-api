@@ -1,5 +1,5 @@
 import type { ConversationMessagesOptions, ConversationMessagesResponse } from '../../types'
-import { SCOPES } from '../constants'
+import { CHATSVC_BASE, SCOPES } from '../constants'
 import type { RestClient } from '../RestClient'
 
 export const fetchConversationMessages = async (
@@ -34,7 +34,7 @@ export const fetchConversationMessages = async (
 
   const normalizedConversationId = encodeURIComponent(conversationId)
   return rest.request<ConversationMessagesResponse>(
-    `https://teams.cloud.microsoft/api/chatsvc/jp/v1/users/ME/conversations/${normalizedConversationId}/messages`,
+    `${CHATSVC_BASE}v1/users/ME/conversations/${normalizedConversationId}/messages`,
     {
       scope: SCOPES.chats,
       query,

@@ -1,7 +1,8 @@
 import type { CliCommandResult, RenderContext } from './types'
 import { ANSI_CODES, SPINNER_FRAMES } from './constants'
-import type { Channel, Team, TeamsExport } from '../types'
+import type { Channel, SendMessageResult, Team, TeamsExport } from '../types'
 import { contentHelp } from './content'
+import { messageHelp } from './messages'
 
 type Color = keyof typeof ANSI_CODES
 
@@ -48,6 +49,10 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
   }
   if (command === 'files' || command === 'notebooks' || command === 'class-notebook') {
     console.log(contentHelp[command].join('\n'))
+    return
+  }
+  if (command === 'send' || command === 'post' || command === 'reply' || command === 'dm') {
+    console.log(messageHelp[command].join('\n'))
     return
   }
   const colorize = (color: Color, text: string) =>
@@ -137,6 +142,10 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  notifications [--limit N]           Fetch latest notifications')
     console.log('  messages <conversationId> [--limit N]   Fetch conversation messages')
     console.log('  channel messages <channelId> [--limit N] Fetch channel messages')
+    console.log('  send <conversationId> <text>        Send a chat/group/channel message')
+    console.log('  post <teamId> <channelId> <text>    Create a channel post')
+    console.log('  reply <teamId> <channelId> <messageId> <text> Reply to a channel post')
+    console.log('  dm <userMri> <text>                 Send a direct message')
     console.log('  teams list                          List all teams for the current user')
     console.log('  teams channels <teamId>             List channels in a team')
     console.log('  me                                  Fetch current user snapshot')
@@ -189,6 +198,25 @@ export function printResult(
 
   const colorize = (color: Color, text: string) =>
     context.color ? `${ANSI_CODES[color]}${text}${ANSI_CODES.reset}` : text
+
+  if (
+    result.command === 'send' ||
+    result.command === 'post' ||
+    result.command === 'reply' ||
+    result.command === 'dm'
+  ) {
+    const message = result.data as SendMessageResult & {
+      threadId?: string
+      createdChat?: boolean
+    }
+    console.log(colorize('bold', 'Message sent'))
+    console.log(`  id: ${colorize('cyan', message.id)}`)
+    console.log(`  conversation: ${colorize('dim', message.conversationId)}`)
+    if (message.threadId) console.log(`  thread: ${colorize('dim', message.threadId)}`)
+    if (result.command === 'dm')
+      console.log(`  chat: ${message.createdChat ? 'created' : 'reused existing 1:1 conversation'}`)
+    return
+  }
 
   if (result.command === 'login') {
     const payload = result.data as { profilePath: string; profile: string }
