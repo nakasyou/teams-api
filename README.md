@@ -86,6 +86,31 @@ teams teams channels <teamId>
 teams me
 ```
 
+#### Send messages, channel posts, replies, and DMs
+
+```bash
+# Send to a DM, group chat, or channel conversation
+teams send <conversationId> "Hello"
+teams send <conversationId> --input ./message.html --html
+teams send <conversationId> "Plain text is escaped" --importance high
+
+# Create a top-level channel post (channelId is the channel conversation ID)
+teams post <teamId> <channelId> "Release notes" --subject "Weekly release notes"
+
+# Reply to a channel post (uses the encoded <channelId>;messageid=<messageId> form)
+teams reply <teamId> <channelId> <rootMessageId> "Thanks!"
+
+# Send a direct message, reusing an existing 1:1 chat when available
+teams dm 8:orgid:<user-guid> "Hello" --self-mri 8:orgid:<your-guid>
+```
+
+Plain text is HTML-escaped and wrapped in `<p>…</p>` (newlines become `<br>`). Use `--html` for raw HTML, or `--text` to send `messagetype: "Text"`. `--subject` sets `properties.subject` for channel posts, and `--importance` accepts `standard`, `high`, or `urgent`. `clientmessageid` is generated from two cryptographic uint32 values (up to 19 digits); use `--client-message-id` to override it. The message id is read from the response `Location` header, and the arrival time from `OriginalArrivalTime`. Replies also include `replyChainId: <rootMessageId>` in the body.
+
+`teamId` is accepted by `post`/`reply` for consistency with the read commands but is not part of the send URL; the channel conversation ID is the endpoint conversation. `teams dm` reuses an existing 1:1 chat found in the current-user snapshot, otherwise it creates a thread. If your own MRI cannot be derived, pass `--self-mri`; an explicit value takes precedence over the snapshot. A self DM (the recipient MRI equals your own) is sent only to an existing dedicated self chat; if none exists it fails without posting, and `--new-chat` is not allowed for self DMs. `--topic` names a newly created chat and `--new-chat` forces creation for normal DMs.
+
+> [!WARNING]
+> `send`, `post`, `reply`, and `dm` write to Teams immediately when invoked. The library exposes the same operations; use tests with a mocked `fetch` and do not call them against a live account unless you intend to post.
+
 #### Files and folders
 
 ```bash
@@ -261,10 +286,30 @@ console.log(notifications.messages?.length ?? 0)
 - `ScopeTokenProvider`
 - `TeamsClient`
 - `teams.conversations.fetchMessages`
+- `teams.conversations.sendMessage`
 - `teams.notifications.fetchMessages`, `fetchMentions`, `fetchAnnotations`
 - `teams.channels.fetch`, `teams.channels.fetchMessages`
+- `teams.channels.post`, `teams.channels.reply`
+- `teams.chats.create`, `teams.chats.sendDirectMessage`
 - `teams.users.fetchShortProfile`
 - `teams.users.me.fetch`, `teams.users.me.fetchPinnedChannels`
+
+Library example:
+
+```ts
+const sent = await client.teams.conversations.sendMessage('19:chat-id@thread.v2', 'Hello')
+console.log(sent.id, sent.originalArrivalTime)
+
+await client.teams.channels.post(teamId, channelId, 'Release notes', {
+  subject: 'Weekly release notes',
+})
+await client.teams.channels.reply(teamId, channelId, rootMessageId, 'Thanks!')
+
+const dm = await client.teams.chats.sendDirectMessage('8:orgid:<user-guid>', 'Hello', {
+  selfMri: '8:orgid:<your-guid>',
+})
+console.log(dm.threadId, dm.createdChat)
+```
 
 ## Development
 

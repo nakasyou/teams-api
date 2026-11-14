@@ -6,6 +6,7 @@ import { parseLimitArgs, parseMessageFilesArgs } from './args'
 import { withSpinner } from './output'
 import type { Channel, DriveItem, MessageFileAttachment, Team, TeamsExport } from '../types'
 import { executeContentCommand, safeJoin, safeLabel, saveResponse } from './content'
+import { executeMessageCommand } from './messages'
 import { attachmentReference, parseMessageFiles, redactDriveItem } from '../rest/routes/attachments'
 import { MAX_CHANNEL_PAGE_SIZE } from '../rest/routes/channels'
 import { summarizeAttachmentError } from '../rest/routes/files'
@@ -22,6 +23,11 @@ export async function executeCommand(
     case 'notebooks':
     case 'class-notebook':
       return executeContentCommand(args, client)
+    case 'send':
+    case 'post':
+    case 'reply':
+    case 'dm':
+      return executeMessageCommand(args, client)
     case 'notifications': {
       if (args.commandArgs.includes('--help') || args.commandArgs.includes('-h')) {
         return {

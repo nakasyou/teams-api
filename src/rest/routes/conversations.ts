@@ -3,12 +3,12 @@ import type {
   ConversationMessagesOptions,
   ConversationMessagesResponse,
 } from '../../types'
-import { SCOPES } from '../constants'
+import { CHATSVC_BASE, SCOPES } from '../constants'
 import type { RestClient } from '../RestClient'
 
 export const MAX_CONVERSATION_MESSAGE_PAGES = 50
 
-const CHATS_SERVICE_HOST = 'teams.cloud.microsoft'
+const CHATS_SERVICE_HOST = new URL(CHATSVC_BASE).host
 const CHATS_SERVICE_PATH_PREFIX = '/api/chatsvc/'
 
 export type ConversationMessagePagesOptions = ConversationMessagesOptions & {
@@ -19,7 +19,7 @@ export type ConversationMessagePagesOptions = ConversationMessagesOptions & {
 }
 
 export const conversationMessagesUrl = (conversationId: string): string =>
-  `https://${CHATS_SERVICE_HOST}/api/chatsvc/jp/v1/users/ME/conversations/${encodeURIComponent(conversationId)}/messages`
+  `${CHATSVC_BASE}v1/users/ME/conversations/${encodeURIComponent(conversationId)}/messages`
 
 export const fetchConversationMessages = async (
   rest: RestClient,
