@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { TeamsClient } from '../src/client/TeamsClient'
+import { MAX_CHANNEL_PAGE_SIZE } from '../src/rest/routes/channels'
 import {
   conversationMessagesUrl,
   validateConversationBackwardLink,
@@ -203,6 +204,46 @@ describe('channel message pagination', () => {
         request.url.searchParams.has('lastModifiedTimeOfLastReturnedReplyChain'),
       ),
     ).toBe(false)
+    expect(requests.every((request) => request.method === 'GET')).toBe(true)
+  })
+
+  test('caps pageSize at 50 and paginates for maxMessages 120', async () => {
+    mockFetch((url) => {
+      const token = url.searchParams.get('continuationToken')
+      const page = token ? Number(token.replace('token-', '')) : 0
+      const start = page * MAX_CHANNEL_PAGE_SIZE
+      const count = Math.min(MAX_CHANNEL_PAGE_SIZE, 120 - start)
+      return json({
+        replyChains: [
+          {
+            messages: Array.from({ length: count }, (_, index) => message(`c${start + index + 1}`)),
+          },
+        ],
+        hasMore: start + count < 120,
+        continuationToken: `token-${page + 1}`,
+      })
+    })
+
+    const result = await client().teams.channels.fetchMessagePages('team-1', 'channel-1', {
+      pageSize: 120,
+      maxMessages: 120,
+    })
+
+    expect(MAX_CHANNEL_PAGE_SIZE).toBe(50)
+    expect(result.messages).toHaveLength(120)
+    expect(result.pages).toBe(3)
+    expect(requests).toHaveLength(3)
+    expect(requests.map((request) => Number(request.url.searchParams.get('pageSize')))).toEqual([
+      50, 50, 50,
+    ])
+    expect(
+      requests.every((request) => Number(request.url.searchParams.get('pageSize')) <= 50),
+    ).toBe(true)
+    expect(requests.map((request) => request.url.searchParams.get('continuationToken'))).toEqual([
+      null,
+      'token-1',
+      'token-2',
+    ])
     expect(requests.every((request) => request.method === 'GET')).toBe(true)
   })
 

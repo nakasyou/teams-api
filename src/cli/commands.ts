@@ -7,6 +7,7 @@ import { withSpinner } from './output'
 import type { Channel, DriveItem, MessageFileAttachment, Team, TeamsExport } from '../types'
 import { executeContentCommand, safeJoin, safeLabel, saveResponse } from './content'
 import { attachmentReference, parseMessageFiles, redactDriveItem } from '../rest/routes/attachments'
+import { MAX_CHANNEL_PAGE_SIZE } from '../rest/routes/channels'
 import { summarizeAttachmentError } from '../rest/routes/files'
 
 export async function executeCommand(
@@ -368,7 +369,7 @@ async function fetchChannelFileMessages(
   const [teamId] = teamIds
   if (!teamId) throw new Error(`Channel not found: ${channelId}`)
   const result = await client.teams.channels.fetchMessagePages(teamId, channelId, {
-    pageSize: limit,
+    pageSize: Math.min(limit, MAX_CHANNEL_PAGE_SIZE),
     maxMessages: limit,
   })
   return result.messages

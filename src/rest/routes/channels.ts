@@ -4,6 +4,12 @@ import type { RestClient } from '../RestClient'
 
 export const MAX_CHANNEL_MESSAGE_PAGES = 50
 
+/**
+ * Maximum `pageSize` accepted by the CSA channel endpoint. Verified live:
+ * larger values return 400 Bad Request.
+ */
+export const MAX_CHANNEL_PAGE_SIZE = 50
+
 export type ChannelQueryOptions = {
   pageSize?: number
   /**
@@ -97,6 +103,8 @@ export const fetchChannelMessagePages = async (
   const maxMessages = options?.maxMessages ?? Number.POSITIVE_INFINITY
   const maxPages = options?.maxPages ?? MAX_CHANNEL_MESSAGE_PAGES
   if (maxPages < 1) throw new Error('Channel message page limit must be positive')
+  const pageSize =
+    options?.pageSize === undefined ? undefined : Math.min(options.pageSize, MAX_CHANNEL_PAGE_SIZE)
 
   const messages: ChannelPostMessage[] = []
   const seenMessageIds = new Set<string>()
@@ -110,7 +118,7 @@ export const fetchChannelMessagePages = async (
       throw new Error(`Channel message pagination exceeded ${maxPages} pages`)
     }
     const posts = await fetchChannel(rest, teamId, channelId, {
-      pageSize: options?.pageSize,
+      pageSize,
       continuationToken: cursor,
     })
     pages += 1
