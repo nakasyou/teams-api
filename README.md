@@ -101,6 +101,12 @@ teams files download <driveId> <itemId> --output ./report.pdf
 teams files download "https://example.sharepoint.com/sites/class/Shared%20Documents/report.pdf" --output ./report.pdf
 teams files download-folder <driveId> <folderItemId> --output ./downloads
 
+# List and save files attached to chat messages or channel posts
+teams messages files <conversationId>
+teams messages files <conversationId> --message <messageId> --download ./attachments
+teams channel files <channelId>
+teams channel files <channelId> --message <messageId> --download ./attachments
+
 # Browse SharePoint directly, including all nested folders
 teams files sharepoint <siteUrl> "/sites/class/Shared Documents" --recursive
 teams files download-sharepoint <siteUrl> "/sites/class/Shared Documents" --output ./downloads
@@ -119,6 +125,8 @@ teams files delete <driveId> <itemId>
 `teamId` is the Teams thread ID returned by `teams teams list`; it is resolved to the Microsoft 365 group ID automatically. `files drives` also accepts `me` or `user:<userId>` for personal OneDrive libraries. Drive IDs and item IDs come from the file commands. A SharePoint library path is server-relative, such as `/sites/class/Shared Documents`.
 
 Downloads preserve binary content, stream to disk, and refuse to overwrite existing local files. Folder downloads include all nested folders. OneNote packages use the notebook export commands below. Uploads default to `--conflict fail`; `replace` and `rename` are explicit alternatives. Files over 4 MiB use sequential upload-session chunks. `--if-match` is available for upload, replacement, rename, move, and deletion.
+
+`messages files` and `channel files` parse the `properties.files` JSON embedded in messages. Each attachment is resolved through its SharePoint sharing URL, file URL, or site/item locator, using a token scoped to the file's own origin (including personal `*-my.sharepoint.com` sites for chats). `--no-resolve` lists attachment metadata without extra requests. `--download` saves every attachment into the directory using sanitized names and never overwrites an existing file. Download URLs containing `tempauth` are always redacted from JSON output.
 
 #### OneNote and Class Notebook
 

@@ -10,8 +10,10 @@ import type {
   NotebookScope,
   NotebookSection,
   NotebookSectionGroup,
+  ODataCollection,
   Team,
 } from '../types'
+import { redactDriveItem } from '../rest/routes/attachments'
 
 export const contentHelp = {
   files: [
@@ -122,32 +124,34 @@ export async function executeContentCommand(
       case 'channel':
         allow()
         count(2)
-        data = await files.listChannelFiles(await resolveGroupId(client, required(0)), required(1))
+        data = redactCollection(
+          await files.listChannelFiles(await resolveGroupId(client, required(0)), required(1)),
+        )
         break
       case 'list':
         allow()
         count(1, 2)
-        data = await files.listChildren(required(0), ids[1])
+        data = redactCollection(await files.listChildren(required(0), ids[1]))
         break
       case 'get':
         allow()
         count(2)
-        data = await files.fetch(required(0), required(1))
+        data = redactDriveItem(await files.fetch(required(0), required(1)))
         break
       case 'path':
         allow()
         count(2)
-        data = await files.fetchByPath(required(0), required(1))
+        data = redactDriveItem(await files.fetchByPath(required(0), required(1)))
         break
       case 'search':
         allow()
         count(2)
-        data = await files.search(required(0), required(1))
+        data = redactCollection(await files.search(required(0), required(1)))
         break
       case 'resolve':
         allow()
         count(1)
-        data = await files.fetchShared(required(0))
+        data = redactDriveItem(await files.fetchShared(required(0)))
         break
       case 'sharepoint':
         allow('folder', 'recursive')
@@ -366,7 +370,11 @@ async function resolveNotebookScope(client: TeamsClient, input: string): Promise
   return { groupId: await resolveGroupId(client, input) }
 }
 
-function safeJoin(directory: string, ...names: string[]): string {
+function redactCollection(collection: ODataCollection<DriveItem>): ODataCollection<DriveItem> {
+  return { ...collection, value: collection.value.map(redactDriveItem) }
+}
+
+export function safeJoin(directory: string, ...names: string[]): string {
   for (const name of names) {
     if (!name || name === '.' || name === '..' || /[\\/\x00]/.test(name))
       throw new Error('Unsafe file or folder name received from API')
@@ -537,7 +545,7 @@ export async function exportNotebook(
   return { directory, pages: manifest.length, resources: resources.size }
 }
 
-function safeLabel(input: string): string {
+export function safeLabel(input: string): string {
   return (
     input
       .replace(/[\\/\x00-\x1f<>:"|?*]/g, '_')

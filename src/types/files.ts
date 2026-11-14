@@ -27,6 +27,7 @@ export type DriveItem = {
   sharepointIds?: { siteUrl?: string; listId?: string; listItemUniqueId?: string }
   currentUserRole?: { blocksDownload?: boolean; readOnly?: boolean; allowEdit?: boolean }
   '@microsoft.graph.downloadUrl'?: string
+  '@microsoft.graph.downloadUrlNoAuth'?: string
   '@content.downloadUrl'?: string
   '@content.downloadUrlNoAuth'?: string
 }
@@ -63,6 +64,37 @@ export type FileReference =
   | { url: string }
   | { driveId: string; itemId: string }
   | { siteUrl: string; uniqueId: string }
+
+export type MessageFileInfo = {
+  itemId?: string | null
+  fileUrl?: string | null
+  siteUrl?: string | null
+  serverRelativeUrl?: string | null
+  shareUrl?: string | null
+  shareId?: string | null
+}
+
+export type MessageFileAttachment = {
+  itemid: string
+  fileName: string
+  fileType?: string
+  fileInfo?: MessageFileInfo
+  fileChicletState?: { serviceName?: string; state?: string }
+  objectUrl?: string
+  openUrl?: string | null
+  type?: string
+  title?: string
+  state?: string
+  sharepointIds?: {
+    listId?: string | null
+    listItemUniqueId?: string | null
+    siteId?: string | null
+    siteUrl?: string | null
+    webId?: string | null
+    driveId?: string | null
+  } | null
+  [key: string]: unknown
+}
 
 export type ConflictBehavior = 'fail' | 'replace' | 'rename'
 export type UploadOptions = {

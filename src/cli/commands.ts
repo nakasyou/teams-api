@@ -1,9 +1,11 @@
+import { resolve as resolvePath } from 'node:path'
 import { TeamsClient } from '../client'
 import type { CliCommandResult, ParsedArgs, RenderContext } from './types'
-import { parseLimitArgs } from './args'
+import { parseLimitArgs, parseMessageFilesArgs } from './args'
 import { withSpinner } from './output'
-import type { Channel, Team, TeamsExport } from '../types'
-import { executeContentCommand } from './content'
+import type { Channel, DriveItem, MessageFileAttachment, Team, TeamsExport } from '../types'
+import { executeContentCommand, safeJoin, safeLabel, saveResponse } from './content'
+import { attachmentReference, parseMessageFiles, redactDriveItem } from '../rest/routes/attachments'
 
 export async function executeCommand(
   args: ParsedArgs,
@@ -36,6 +38,10 @@ export async function executeCommand(
       return { command: 'notifications', data: payload }
     }
     case 'messages': {
+      const [subCommand, ...subCommandArgs] = args.commandArgs
+      if (subCommand === 'files') {
+        return executeMessageFiles('messages', subCommandArgs, client, animationContext)
+      }
       if (args.commandArgs.includes('--help') || args.commandArgs.includes('-h')) {
         return {
           command: 'help',
@@ -64,6 +70,9 @@ export async function executeCommand(
           command: 'help',
           data: 'channel',
         }
+      }
+      if (subCommand === 'files') {
+        return executeMessageFiles('channel', subCommandArgs, client, animationContext)
       }
       if (subCommand === 'messages') {
         if (subCommandArgs.includes('--help') || subCommandArgs.includes('-h')) {
@@ -187,6 +196,8 @@ export async function executeCommand(
     case 'list':
     case 'channels':
     case 'channel-messages':
+    case 'messages-files':
+    case 'channel-files':
       throw new Error(`Unexpected top-level command: ${args.command}`)
     case 'help':
       return { command: 'help', data: undefined }
@@ -206,4 +217,118 @@ function resolveTeamIdFromMe(me: TeamsExport, channelId: string): string[] {
   }
 
   return teamIds
+}
+
+type MessageFileRow = {
+  messageId: string
+  index: number
+  name: string
+  type?: string
+  host?: string
+  driveId?: string
+  itemId?: string
+  size?: number
+  blocksDownload?: boolean
+  item?: DriveItem
+  download?: { path: string; bytes: number }
+}
+
+type MessageWithFiles = {
+  id?: string | null
+  properties?: { files?: unknown } | null
+}
+
+async function executeMessageFiles(
+  kind: 'messages' | 'channel',
+  filesArgs: string[],
+  client: TeamsClient,
+  context: RenderContext,
+): Promise<CliCommandResult> {
+  const command: 'messages-files' | 'channel-files' =
+    kind === 'messages' ? 'messages-files' : 'channel-files'
+  if (filesArgs.includes('--help') || filesArgs.includes('-h')) {
+    return { command: 'help', data: command }
+  }
+
+  const commandLabel = kind === 'messages' ? 'messages files' : 'channel files'
+  const parsed = parseMessageFilesArgs(filesArgs, commandLabel)
+  const [targetId, ...extra] = parsed.rest
+  if (!targetId) {
+    throw new Error(
+      `Usage: teams ${commandLabel} <${kind === 'messages' ? 'conversationId' : 'channelId'}> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]`,
+    )
+  }
+  if (extra.length > 0) {
+    throw new Error(`teams ${commandLabel} accepts one ID argument`)
+  }
+
+  const directory = parsed.download ? resolvePath(parsed.download) : undefined
+  return withSpinner(
+    context,
+    directory ? 'Fetching and downloading attached files...' : 'Fetching attached files...',
+    async () => {
+      const messages: MessageWithFiles[] =
+        kind === 'messages'
+          ? (await client.teams.conversations.fetchMessages(targetId, { pageSize: parsed.limit }))
+              .messages
+          : await fetchChannelFileMessages(client, targetId, parsed.limit)
+
+      const rows: MessageFileRow[] = []
+      for (const message of messages) {
+        const messageId = typeof message.id === 'string' ? message.id : ''
+        if (parsed.messageId !== undefined && messageId !== parsed.messageId) continue
+        for (const [index, attachment] of parseMessageFiles(message.properties).entries()) {
+          const row: MessageFileRow = {
+            messageId,
+            index,
+            name: attachment.fileName,
+            type: attachment.fileType ?? attachment.type,
+            host: attachmentHost(attachment),
+          }
+          if (parsed.resolve) {
+            const item = await client.teams.files.resolveAttachment(attachment)
+            row.driveId = item.parentReference?.driveId
+            row.itemId = item.id
+            row.size = item.size
+            row.blocksDownload = item.currentUserRole?.blocksDownload
+            row.item = redactDriveItem(item)
+          }
+          if (directory) {
+            const path = safeJoin(directory, safeLabel(attachment.fileName))
+            row.download = await saveResponse(
+              await client.teams.files.downloadAttachment(attachment),
+              path,
+            )
+          }
+          rows.push(row)
+        }
+      }
+      return { command, data: rows }
+    },
+  )
+}
+
+async function fetchChannelFileMessages(
+  client: TeamsClient,
+  channelId: string,
+  limit: number,
+): Promise<MessageWithFiles[]> {
+  const me = await client.teams.users.me.fetch()
+  const teamIds = resolveTeamIdFromMe(me, channelId)
+  if (teamIds.length === 0) throw new Error(`Channel not found: ${channelId}`)
+  if (teamIds.length > 1)
+    throw new Error(`Ambiguous channel: ${channelId} exists in multiple teams`)
+  const [teamId] = teamIds
+  if (!teamId) throw new Error(`Channel not found: ${channelId}`)
+  return client.teams.channels.fetchMessages(teamId, channelId, { pageSize: limit })
+}
+
+function attachmentHost(attachment: MessageFileAttachment): string | undefined {
+  const reference = attachmentReference(attachment)
+  if (!reference || 'driveId' in reference) return undefined
+  try {
+    return new URL('url' in reference ? reference.url : reference.siteUrl).hostname
+  } catch {
+    return undefined
+  }
 }

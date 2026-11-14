@@ -77,6 +77,22 @@ async function runCli(argv: string[]): Promise<void> {
     return
   }
 
+  if (
+    (args.command === 'messages' || args.command === 'channel') &&
+    (args.commandArgs.includes('--help') || args.commandArgs.includes('-h'))
+  ) {
+    const subCommand = args.commandArgs[0]
+    printHelp(
+      context,
+      subCommand === 'files'
+        ? args.command === 'messages'
+          ? 'messages-files'
+          : 'channel-files'
+        : args.command,
+    )
+    return
+  }
+
   if (args.command === 'login') {
     try {
       const loginArgs = await withPromptedLoginToken(args, context)

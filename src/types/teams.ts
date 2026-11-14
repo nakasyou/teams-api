@@ -512,6 +512,7 @@ export type ConversationMessageProperties = {
   mentions?: string
   languageStamp?: string
   edittime?: number
+  files?: string
   [key: string]: unknown
 }
 

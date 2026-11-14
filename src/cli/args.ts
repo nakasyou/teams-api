@@ -154,6 +154,89 @@ function parseCommand(input: string): CommandName {
   throw new Error(`Unknown command: ${input}`)
 }
 
+export type MessageFilesOptions = {
+  limit: number
+  messageId?: string
+  resolve: boolean
+  download?: string
+  rest: string[]
+}
+
+const MESSAGE_FILES_OPTION_CONFIG = {
+  limit: { type: 'string' },
+  message: { type: 'string' },
+  'no-resolve': { type: 'boolean' },
+  download: { type: 'string' },
+} as const
+
+export function parseMessageFilesArgs(args: string[], command: string): MessageFilesOptions {
+  const tokenized = parseNodeArgs({
+    args,
+    options: MESSAGE_FILES_OPTION_CONFIG,
+    allowPositionals: true,
+    strict: false,
+    tokens: true,
+  })
+
+  const rest: string[] = []
+  let limit = DEFAULT_MESSAGE_LIMIT
+  let messageId: string | undefined
+  let resolve = true
+  let download: string | undefined
+
+  for (const token of tokenized.tokens) {
+    if (token.kind === 'positional') {
+      rest.push(token.value)
+      continue
+    }
+    if (token.kind === 'option-terminator') {
+      throw new Error(`Unknown option: ${rawToken(args, token.index, '--')}`)
+    }
+
+    if (token.name === 'limit') {
+      const value = stringOption(token.value, token.inlineValue, '--limit', command)
+      const parsed = Number.parseInt(value, 10)
+      if (Number.isNaN(parsed) || parsed <= 0) {
+        throw new Error(`--limit requires a positive integer for command: teams ${command}`)
+      }
+      limit = parsed
+      continue
+    }
+    if (token.name === 'message') {
+      messageId = stringOption(token.value, token.inlineValue, '--message', command)
+      continue
+    }
+    if (token.name === 'no-resolve') {
+      resolve = false
+      continue
+    }
+    if (token.name === 'download') {
+      download = stringOption(token.value, token.inlineValue, '--download', command)
+      continue
+    }
+
+    throw new Error(`Unknown option: ${rawToken(args, token.index, token.rawName)}`)
+  }
+
+  return { limit, messageId, resolve, download, rest }
+}
+
+function stringOption(
+  value: string | boolean | undefined,
+  inlineValue: boolean | undefined,
+  option: string,
+  command: string,
+): string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    (inlineValue === false && value.startsWith('--'))
+  ) {
+    throw new Error(`${option} requires a value for command: teams ${command}`)
+  }
+  return value
+}
+
 export function parseLimitArgs(args: string[], command: string): LimitOptions {
   const tokenized = parseNodeArgs({
     args,

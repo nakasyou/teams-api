@@ -13,6 +13,12 @@ export {
 } from './client'
 export * from './types'
 export { TeamsFilesAPI } from './rest/routes/files'
+export {
+  parseMessageFiles,
+  attachmentReference,
+  attachmentReferences,
+  redactDriveItem,
+} from './rest/routes/attachments'
 export { TeamsNotebooksAPI, TeamsClassNotebooksAPI } from './rest/routes/notebooks'
 
 export { DEFAULT_TENANT_ID, resolveTenantId } from './auth/tenant'

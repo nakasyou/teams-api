@@ -10,6 +10,7 @@ import type {
   DriveItem,
   FileListOptions,
   FileReference,
+  MessageFileAttachment,
   ODataCollection,
   SharePointFileList,
   SharePointFileListOptions,
@@ -22,6 +23,7 @@ import {
   listQuery,
   validateServiceUrl,
 } from './content'
+import { attachmentReferences } from './attachments'
 
 export class TeamsFilesAPI {
   constructor(private readonly rest: RestClient) {}
@@ -127,6 +129,30 @@ export class TeamsFilesAPI {
     if ('siteUrl' in reference)
       return this.fetchSharePointItem(reference.siteUrl, reference.uniqueId)
     return this.fetch(reference.driveId, reference.itemId)
+  }
+
+  async resolveAttachment(attachment: MessageFileAttachment): Promise<DriveItem> {
+    const errors: string[] = []
+    for (const reference of attachmentReferences(attachment)) {
+      try {
+        return await this.resolve(reference)
+      } catch (error) {
+        errors.push(errorMessage(error))
+      }
+    }
+    throw attachmentError('resolve', attachment, errors)
+  }
+
+  async downloadAttachment(attachment: MessageFileAttachment): Promise<Response> {
+    const errors: string[] = []
+    for (const reference of attachmentReferences(attachment)) {
+      try {
+        return await this.download(reference)
+      } catch (error) {
+        errors.push(errorMessage(error))
+      }
+    }
+    throw attachmentError('download', attachment, errors)
   }
 
   async download(reference: FileReference): Promise<Response> {
@@ -447,4 +473,18 @@ export class TeamsFilesAPI {
     }
     return response
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function attachmentError(
+  action: 'resolve' | 'download',
+  attachment: MessageFileAttachment,
+  errors: string[],
+): Error {
+  if (errors.length === 0)
+    return new Error(`No SharePoint locator on attachment ${attachment.fileName}`)
+  return new Error(`Could not ${action} attachment ${attachment.fileName}: ${errors.join('; ')}`)
 }
