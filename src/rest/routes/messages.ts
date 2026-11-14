@@ -220,13 +220,78 @@ export const createChat = async (
   }
 }
 
-/** Find an existing 1:1 chat with `userMri` in a current-user snapshot. */
-export const findOneToOneChat = (me: TeamsExport, userMri: string): ChatThread | undefined => {
+const SELF_NOTES_CHAT_ID = '48:notes'
+
+const normalizeMri = (value: string): string => value.trim().toLowerCase()
+
+const distinctChatMemberMris = (chat: ChatThread): Set<string> => {
+  const mris = new Set<string>()
+  for (const member of asArray<{ mri?: string }>(chat.members)) {
+    if (typeof member.mri === 'string' && member.mri.trim()) {
+      mris.add(normalizeMri(member.mri))
+    }
+  }
+  return mris
+}
+
+/**
+ * Find an existing chat for `userMri` in a current-user snapshot.
+ *
+ * `selfMri` is required to distinguish the counterpart from the signed-in user:
+ * every 1:1 chat contains the signed-in user, so matching `userMri` alone would
+ * also select an unrelated DM when sending a self DM.
+ *
+ * A normal DM matches a 1:1 chat whose only non-self member is `userMri`. A self
+ * DM matches only the `48:notes` self-notes conversation (preferred when
+ * present), or otherwise a 1:1 chat whose distinct roster is non-empty and
+ * contains only `selfMri`. A group/meeting chat (`isOneOnOne !== true`) whose
+ * snapshot roster happens to contain only self — e.g. a partial/stale roster,
+ * or a chat others have left — is never selected, so the caller can refuse
+ * instead of sending a note to the wrong chat. It never matches a chat
+ * containing another member, so the caller can refuse instead of sending a
+ * note to the wrong person.
+ */
+export const findOneToOneChat = (
+  me: TeamsExport,
+  userMri: string,
+  selfMri: string,
+): ChatThread | undefined => {
+  const user = normalizeMri(userMri)
+  const self = normalizeMri(selfMri)
+  if (!user || !self) return undefined
+  const selfDm = user === self
   const chats = asArray<ChatThread>(me.chats)
+
+  if (selfDm) {
+    // (a) Prefer the dedicated self-notes conversation by id. A group or
+    // meeting chat whose snapshot roster happens to contain only self (partial
+    // or stale roster, or others have left) must never be selected, so only
+    // the well-known id is trusted without an isOneOnOne check.
+    const notes = chats.find(
+      (chat) => typeof chat.id === 'string' && normalizeMri(chat.id) === SELF_NOTES_CHAT_ID,
+    )
+    if (notes) return notes
+    // (b) Fall back to a 1:1 chat whose distinct roster is non-empty and
+    // contains only self. An empty roster is rejected here (a partial snapshot
+    // could hide the real roster); only 48:notes above may match with any
+    // roster shape.
+    return chats.find((chat) => {
+      if (chat.isOneOnOne !== true) return false
+      const members = distinctChatMemberMris(chat)
+      if (members.size === 0) return false
+      for (const mri of members) {
+        if (mri !== self) return false
+      }
+      return true
+    })
+  }
+
   return chats.find((chat) => {
+    const members = distinctChatMemberMris(chat)
+    const counterparts = new Set([...members].filter((mri) => mri !== self))
+
     if (chat.isOneOnOne !== true) return false
-    const members = asArray<{ mri?: string }>(chat.members)
-    return members.some((member) => member.mri === userMri)
+    return counterparts.size === 1 && counterparts.has(user)
   })
 }
 
@@ -243,6 +308,12 @@ const readMri = (value: unknown): string | undefined => {
  * Best-effort resolution of the signed-in user's MRI from the current-user
  * snapshot. The web client does not expose a stable self field, so callers can
  * (and for password-less/live accounts should) pass `selfMri` explicitly.
+ *
+ * The roster-intersection fallback assumes the signed-in user appears in every
+ * chat roster. It only accepts an intersection with exactly one member; with a
+ * single ordinary 1:1 chat that intersection has two members and is rejected.
+ * A malformed/partial snapshot that omits the signed-in user could still yield a
+ * non-self MRI, so prefer an explicit `selfMri` whenever possible.
  */
 export const findCurrentUserMri = (me: TeamsExport): string | undefined => {
   const root = me as unknown as JsonObject

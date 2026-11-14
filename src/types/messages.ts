@@ -83,14 +83,17 @@ export type CreateChatResult = {
 
 export type SendDirectMessageOptions = SendMessageOptions & {
   /**
-   * Your own MRI. When omitted, it is derived from the current-user snapshot
-   * when possible; otherwise the call throws.
+   * Your own MRI. Takes precedence when choosing the counterpart in a chat. When
+   * omitted, it is derived from the current-user snapshot when possible;
+   * otherwise the call throws before sending.
    */
   selfMri?: string
   topic?: string
   /**
    * Reuse an existing 1:1 chat when it appears in the current-user snapshot.
-   * Defaults to true. Set false to always create a new thread.
+   * Defaults to true. Set false to always create a new thread for a normal DM.
+   * A self DM always requires an existing dedicated self chat, so false is
+   * rejected for self DMs.
    */
   reuseExisting?: boolean
 }

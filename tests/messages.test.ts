@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { TeamsClient } from '../src/client/TeamsClient'
 import { SCOPES } from '../src/rest/constants'
+import { findOneToOneChat } from '../src/rest/routes/messages'
 import { parseArgs } from '../src/cli/args'
 import { executeMessageCommand } from '../src/cli/messages'
+import type { TeamsExport } from '../src/types'
 
 const scopes: string[] = []
 const client = () =>
@@ -13,6 +15,13 @@ const client = () =>
     },
   })
 const json = (data: unknown) => Response.json(data)
+const snapshot = (chats: unknown[]): TeamsExport =>
+  ({ teams: [], chats, users: [], privateFeeds: [] }) as unknown as TeamsExport
+const chat = (id: string, isOneOnOne: boolean, members: string[]): unknown => ({
+  id,
+  isOneOnOne,
+  members: members.map((mri) => ({ mri })),
+})
 const messageResponse = (
   location = 'https://teams.cloud.microsoft/api/chatsvc/jp/v1/users/ME/conversations/c/messages/1699',
   body: unknown = { OriginalArrivalTime: '1699' },
@@ -372,6 +381,294 @@ describe('chats', () => {
     expect(requests[2]?.path).toBe(
       '/api/chatsvc/jp/v1/users/ME/conversations/19%3Anew%40thread.v2/messages',
     )
+  })
+})
+
+describe('direct message selection', () => {
+  const self = '8:orgid:self'
+  const alice = '8:orgid:alice'
+  const bob = '8:orgid:bob'
+
+  test('self DM sends to the self-only chat even when a chat with someone else comes first', async () => {
+    const calls: { url: URL; init?: RequestInit }[] = []
+    mockFetch((url, init) => {
+      calls.push({ url, init })
+      if (url.pathname.endsWith('/users/me')) {
+        return json(
+          snapshot([
+            chat('19:self-alice@unq.gbl.spaces', true, [self, alice]),
+            chat('19:self-only@unq.gbl.spaces', true, [self]),
+          ]),
+        )
+      }
+      expect(init?.method).toBe('POST')
+      return messageResponse(
+        'https://teams.cloud.microsoft/api/chatsvc/jp/v1/users/ME/conversations/c/messages/6001',
+      )
+    })
+
+    const result = await client().teams.chats.sendDirectMessage(self, 'note to self', {
+      selfMri: self,
+    })
+
+    const posts = calls.filter((call) => call.init?.method === 'POST')
+    expect(posts).toHaveLength(1)
+    expect(posts[0]?.url.pathname).toBe(
+      '/api/chatsvc/jp/v1/users/ME/conversations/19%3Aself-only%40unq.gbl.spaces/messages',
+    )
+    expect(posts[0]?.url.pathname).not.toContain('self-alice')
+    expect(result.createdChat).toBe(false)
+    expect(result.threadId).toBe('19:self-only@unq.gbl.spaces')
+    expect(result.conversationId).toBe('19:self-only@unq.gbl.spaces')
+  })
+
+  test('self DM refuses when only a chat with another member exists and makes no POST', async () => {
+    const calls: { url: URL; init?: RequestInit }[] = []
+    mockFetch((url, init) => {
+      calls.push({ url, init })
+      if (url.pathname.endsWith('/users/me')) {
+        return json(snapshot([chat('19:self-alice@unq.gbl.spaces', true, [self, alice])]))
+      }
+      throw new Error(`Unexpected request: ${url.pathname}`)
+    })
+
+    await expect(
+      client().teams.chats.sendDirectMessage(self, 'note to self', { selfMri: self }),
+    ).rejects.toThrow(/dedicated self chat/i)
+    expect(calls.filter((call) => call.init?.method === 'POST')).toHaveLength(0)
+    expect(calls.map((call) => call.url.pathname)).toEqual(['/api/csa/apac/api/v3/teams/users/me'])
+  })
+
+  test('self DM refuses a non-1:1 group chat whose roster is only self and makes no POST', async () => {
+    const calls: { url: URL; init?: RequestInit }[] = []
+    mockFetch((url, init) => {
+      calls.push({ url, init })
+      if (url.pathname.endsWith('/users/me')) {
+        // A partial/stale snapshot (or a chat others have left) could leave
+        // only self in the roster; it must never be selected for a self DM.
+        return json(snapshot([chat('19:group-stale@thread.v2', false, [self])]))
+      }
+      throw new Error(`Unexpected request: ${url.pathname}`)
+    })
+
+    await expect(
+      client().teams.chats.sendDirectMessage(self, 'note to self', { selfMri: self }),
+    ).rejects.toThrow(/dedicated self chat/i)
+    expect(calls.filter((call) => call.init?.method === 'POST')).toHaveLength(0)
+    expect(calls.map((call) => call.url.pathname)).toEqual(['/api/csa/apac/api/v3/teams/users/me'])
+  })
+
+  test('self DM prefers 48:notes when present', async () => {
+    const calls: { url: URL; init?: RequestInit }[] = []
+    mockFetch((url, init) => {
+      calls.push({ url, init })
+      if (url.pathname.endsWith('/users/me')) {
+        return json(
+          snapshot([
+            chat('19:self-only@unq.gbl.spaces', true, [self]),
+            chat('48:notes', false, []),
+          ]),
+        )
+      }
+      expect(init?.method).toBe('POST')
+      return messageResponse(
+        'https://teams.cloud.microsoft/api/chatsvc/jp/v1/users/ME/conversations/c/messages/6004',
+      )
+    })
+
+    const result = await client().teams.chats.sendDirectMessage(self, 'note to self', {
+      selfMri: self,
+    })
+
+    const posts = calls.filter((call) => call.init?.method === 'POST')
+    expect(posts).toHaveLength(1)
+    expect(posts[0]?.url.pathname).toBe(
+      '/api/chatsvc/jp/v1/users/ME/conversations/48%3Anotes/messages',
+    )
+    expect(result.createdChat).toBe(false)
+    expect(result.threadId).toBe('48:notes')
+    expect(result.conversationId).toBe('48:notes')
+  })
+
+  test('normal DM skips the self chat and other DMs before the exact counterpart', async () => {
+    const calls: { url: URL; init?: RequestInit }[] = []
+    mockFetch((url, init) => {
+      calls.push({ url, init })
+      if (url.pathname.endsWith('/users/me')) {
+        return json(
+          snapshot([
+            chat('19:self-only@unq.gbl.spaces', true, [self]),
+            chat('19:self-bob@unq.gbl.spaces', true, [self, bob]),
+            chat('19:self-alice@unq.gbl.spaces', true, [self, alice]),
+          ]),
+        )
+      }
+      return messageResponse(
+        'https://teams.cloud.microsoft/api/chatsvc/jp/v1/users/ME/conversations/c/messages/6002',
+      )
+    })
+
+    const result = await client().teams.chats.sendDirectMessage(alice, 'Hi Alice')
+
+    const posts = calls.filter((call) => call.init?.method === 'POST')
+    expect(posts).toHaveLength(1)
+    expect(posts[0]?.url.pathname).toBe(
+      '/api/chatsvc/jp/v1/users/ME/conversations/19%3Aself-alice%40unq.gbl.spaces/messages',
+    )
+    expect(result.threadId).toBe('19:self-alice@unq.gbl.spaces')
+  })
+
+  test('explicit selfMri takes precedence over the snapshot heuristic when selecting a chat', async () => {
+    const requests: {
+      method: string
+      path: string
+      body?: Record<string, unknown>
+    }[] = []
+    mockFetch((url, init) => {
+      requests.push({
+        method: init?.method ?? 'GET',
+        path: url.pathname,
+        body: init?.body ? bodyOf(init) : undefined,
+      })
+      if (url.pathname.endsWith('/users/me')) {
+        // Both chats share bob, so the roster intersection heuristic would
+        // resolve the wrong self and select the bob/alice chat for alice.
+        return json(
+          snapshot([
+            chat('19:bob-alice@unq.gbl.spaces', true, [bob, alice]),
+            chat('19:bob-carol@unq.gbl.spaces', true, [bob, '8:orgid:carol']),
+          ]),
+        )
+      }
+      if (url.pathname.endsWith('/threads')) {
+        return new Response(JSON.stringify({}), {
+          status: 201,
+          headers: {
+            location:
+              'https://teams.cloud.microsoft/api/chatsvc/jp/v1/threads/19%3Aexplicit-self%40thread.v2',
+          },
+        })
+      }
+      return messageResponse(
+        'https://teams.cloud.microsoft/api/chatsvc/jp/v1/users/ME/conversations/c/messages/6003',
+      )
+    })
+
+    const result = await client().teams.chats.sendDirectMessage(alice, 'Hi Alice', {
+      selfMri: self,
+    })
+
+    const threadPost = requests.find((request) => request.path.endsWith('/threads'))
+    expect(threadPost?.method).toBe('POST')
+    expect(threadPost?.body).toMatchObject({
+      members: [
+        { id: self, role: 'Admin' },
+        { id: alice, role: 'User' },
+      ],
+    })
+    const posts = requests.filter((request) => request.method === 'POST')
+    expect(posts.some((request) => request.path.includes('bob-alice'))).toBe(false)
+    expect(posts.at(-1)?.path).toBe(
+      '/api/chatsvc/jp/v1/users/ME/conversations/19%3Aexplicit-self%40thread.v2/messages',
+    )
+    expect(result.createdChat).toBe(true)
+    expect(result.threadId).toBe('19:explicit-self@thread.v2')
+  })
+
+  test('throws before any POST when selfMri cannot be resolved', async () => {
+    const calls: { url: URL; init?: RequestInit }[] = []
+    mockFetch((url, init) => {
+      calls.push({ url, init })
+      if (url.pathname.endsWith('/users/me')) {
+        return json(snapshot([chat('19:self-alice@unq.gbl.spaces', true, [self, alice])]))
+      }
+      throw new Error(`Unexpected request: ${url.pathname}`)
+    })
+
+    await expect(client().teams.chats.sendDirectMessage(alice, 'Hi Alice')).rejects.toThrow(
+      /Cannot determine your own MRI/,
+    )
+    expect(calls.filter((call) => call.init?.method === 'POST')).toHaveLength(0)
+    expect(calls).toHaveLength(1)
+  })
+
+  test('refuses --new-chat semantics for a self DM without making a request', async () => {
+    const mock = mockFetch(() => {
+      throw new Error('Must not request')
+    })
+
+    await expect(
+      client().teams.chats.sendDirectMessage(self, 'note to self', {
+        selfMri: self,
+        reuseExisting: false,
+      }),
+    ).rejects.toThrow(/Cannot create a new self chat/)
+    expect(mock).not.toHaveBeenCalled()
+  })
+})
+
+describe('findOneToOneChat', () => {
+  const self = '8:orgid:self'
+  const alice = '8:orgid:alice'
+  const bob = '8:orgid:bob'
+
+  test('matches a normal DM only when the non-self roster is exactly the recipient', () => {
+    const me = snapshot([
+      chat('19:self-bob', true, [self, bob]),
+      chat('19:self-alice', true, [self, alice]),
+    ])
+    expect(findOneToOneChat(me, alice, self)?.id).toBe('19:self-alice')
+    expect(findOneToOneChat(me, bob, self)?.id).toBe('19:self-bob')
+    expect(findOneToOneChat(me, '8:orgid:carol', self)).toBeUndefined()
+  })
+
+  test('rejects chats with extra non-self members and non-1:1 chats', () => {
+    const group = snapshot([chat('19:self-alice-bob', true, [self, alice, bob])])
+    expect(findOneToOneChat(group, alice, self)).toBeUndefined()
+
+    const notOneOnOne = snapshot([chat('19:self-alice', false, [self, alice])])
+    expect(findOneToOneChat(notOneOnOne, alice, self)).toBeUndefined()
+  })
+
+  test('self DM matches only the dedicated self chat, not an earlier DM', () => {
+    const me = snapshot([
+      chat('19:self-alice', true, [self, alice]),
+      chat('19:self-only', true, [self]),
+    ])
+    expect(findOneToOneChat(me, self, self)?.id).toBe('19:self-only')
+    expect(findOneToOneChat(me, alice, self)?.id).toBe('19:self-alice')
+  })
+
+  test('normalizes MRI case and whitespace and never returns a chat with another member for self', () => {
+    const me = snapshot([chat('19:self-alice', true, [' 8:ORGID:SELF ', '8:OrgId:Alice'])])
+    expect(findOneToOneChat(me, ' 8:orgid:alice ', '8:orgid:self')?.id).toBe('19:self-alice')
+
+    const onlyOther = snapshot([chat('19:self-alice', true, [self, alice])])
+    expect(findOneToOneChat(onlyOther, ' 8:ORGID:SELF ', '8:orgid:self')).toBeUndefined()
+  })
+
+  test('accepts the self-notes conversation id when its roster is empty', () => {
+    const notes = snapshot([chat('48:notes', false, [])])
+    expect(findOneToOneChat(notes, self, self)?.id).toBe('48:notes')
+
+    const unknownEmpty = snapshot([chat('19:empty', true, [])])
+    expect(findOneToOneChat(unknownEmpty, self, self)).toBeUndefined()
+  })
+
+  test('never selects a non-1:1 group chat whose roster is only self for a self DM', () => {
+    const staleGroup = snapshot([chat('19:group-stale@thread.v2', false, [self])])
+    expect(findOneToOneChat(staleGroup, self, self)).toBeUndefined()
+
+    const leftGroup = snapshot([chat('19:group-left@thread.v2', false, [self, self])])
+    expect(findOneToOneChat(leftGroup, self, self)).toBeUndefined()
+  })
+
+  test('prefers 48:notes over a 1:1 self-only chat', () => {
+    const notesFirst = snapshot([chat('48:notes', false, []), chat('19:self-only', true, [self])])
+    expect(findOneToOneChat(notesFirst, self, self)?.id).toBe('48:notes')
+
+    const selfFirst = snapshot([chat('19:self-only', true, [self]), chat('48:notes', false, [])])
+    expect(findOneToOneChat(selfFirst, self, self)?.id).toBe('48:notes')
   })
 })
 

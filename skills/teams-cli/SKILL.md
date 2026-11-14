@@ -114,7 +114,7 @@ teams dm 8:orgid:<user-guid> "Hello" --self-mri 8:orgid:<your-guid>
 
 - Plain text is escaped and wrapped in `<p>`; `--html` sends raw HTML and `--text` sends `messagetype: "Text"`.
 - `--subject` sets a channel post title and `--importance` accepts `standard`, `high`, or `urgent`.
-- `teams dm` reuses an existing 1:1 chat when found and otherwise creates one; pass `--self-mri` if your MRI cannot be derived.
+- `teams dm` reuses an existing 1:1 chat when found and otherwise creates one; pass `--self-mri` if your MRI cannot be derived (an explicit value takes precedence over the snapshot). A self DM is sent only to an existing dedicated self chat; if none exists it fails without posting, and `--new-chat` is not allowed for self DMs.
 - These commands write to Teams immediately. Only run them when the user explicitly intends to send a message, post, reply, or DM.
 
 ### Teams and channels

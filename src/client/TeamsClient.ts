@@ -289,12 +289,30 @@ export class TeamsClient {
     content: string,
     options: SendDirectMessageOptions = {},
   ): Promise<SendDirectMessageResult> {
-    if (!userMri.trim()) throw new Error('A recipient MRI is required')
+    const recipientMri = userMri.trim()
+    if (!recipientMri) throw new Error('A recipient MRI is required')
     const { selfMri, topic, reuseExisting = true, ...messageOptions } = options
-    const me = reuseExisting || !selfMri ? await this.fetchCurrentUser() : undefined
+    const me = reuseExisting || !selfMri?.trim() ? await this.fetchCurrentUser() : undefined
 
-    if (reuseExisting && me) {
-      const existing = findOneToOneChat(me, userMri)
+    // Resolve self before selecting a chat. Matching a 1:1 chat without knowing
+    // which member is the signed-in user can select someone else's DM.
+    const resolvedSelfMri = selfMri?.trim() || (me ? findCurrentUserMri(me) : undefined)
+    if (!resolvedSelfMri) {
+      throw new Error(
+        'Cannot determine your own MRI. Pass selfMri (library) or --self-mri (CLI) to send a direct message.',
+      )
+    }
+    const isSelfDm = recipientMri.toLowerCase() === resolvedSelfMri.toLowerCase()
+
+    if (isSelfDm && !reuseExisting) {
+      throw new Error(
+        'Cannot create a new self chat. A self DM requires an existing dedicated self chat.',
+      )
+    }
+
+    if (reuseExisting) {
+      if (!me) throw new Error('Cannot read the current-user snapshot to reuse a chat')
+      const existing = findOneToOneChat(me, recipientMri, resolvedSelfMri)
       if (existing) {
         const result = await sendConversationMessage(
           this.rest,
@@ -304,17 +322,16 @@ export class TeamsClient {
         )
         return { ...result, threadId: existing.id, createdChat: false }
       }
+      if (isSelfDm) {
+        throw new Error(
+          'No dedicated self chat was found in the current-user snapshot. A self DM requires an existing self chat; no message was sent.',
+        )
+      }
     }
 
-    const resolvedSelfMri = selfMri?.trim() || (me ? findCurrentUserMri(me) : undefined)
-    if (!resolvedSelfMri) {
-      throw new Error(
-        'Cannot determine your own MRI. Pass selfMri (library) or --self-mri (CLI) to create a chat.',
-      )
-    }
     const chat = await this.createChatThread({
       selfMri: resolvedSelfMri,
-      members: [userMri],
+      members: [recipientMri],
       ...(topic ? { topic } : {}),
     })
     const result = await sendConversationMessage(this.rest, chat.threadId, content, messageOptions)
