@@ -61,7 +61,22 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
   if (command === 'messages') {
     console.log('Usage:')
     console.log('  teams messages <conversationId> [--limit <n>]')
-    console.log('  Fetch messages in a conversation')
+    console.log(
+      '  teams messages files <conversationId> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]',
+    )
+    console.log('  Fetch messages in a conversation, or list/download files attached to them')
+    return
+  }
+
+  if (command === 'messages-files') {
+    console.log('Usage:')
+    console.log(
+      '  teams messages files <conversationId> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]',
+    )
+    console.log('  List files attached to conversation messages')
+    console.log('  --limit N scans up to N messages across pages (default 20)')
+    console.log('  --message filters to one message; --no-resolve lists metadata only')
+    console.log('  --download saves each file into the directory without overwriting')
     return
   }
 
@@ -75,7 +90,22 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
   if (command === 'channel' || command === 'channel-messages') {
     console.log('Usage:')
     console.log('  teams channel messages <channelId> [--limit <n>]')
-    console.log('  Fetch messages in a team channel using channel id')
+    console.log(
+      '  teams channel files <channelId> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]',
+    )
+    console.log('  Fetch messages or files in a team channel using channel id')
+    return
+  }
+
+  if (command === 'channel-files') {
+    console.log('Usage:')
+    console.log(
+      '  teams channel files <channelId> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]',
+    )
+    console.log('  List files attached to channel posts')
+    console.log('  --limit N scans up to N messages across pages (default 20)')
+    console.log('  The owning team is resolved from the current user')
+    console.log('  --download saves each file into the directory without overwriting')
     return
   }
 
@@ -141,7 +171,13 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  class-notebook <command>             Browse and export Class Notebooks')
     console.log('  notifications [--limit N]           Fetch latest notifications')
     console.log('  messages <conversationId> [--limit N]   Fetch conversation messages')
+    console.log(
+      '  messages files <conversationId> [--limit N] [--no-resolve] [--download <dir>] List/download message attachments',
+    )
     console.log('  channel messages <channelId> [--limit N] Fetch channel messages')
+    console.log(
+      '  channel files <channelId> [--limit N] [--no-resolve] [--download <dir>] List/download channel attachments',
+    )
     console.log('  send <conversationId> <text>        Send a chat/group/channel message')
     console.log('  post <teamId> <channelId> <text>    Create a channel post')
     console.log('  reply <teamId> <channelId> <messageId> <text> Reply to a channel post')
@@ -187,6 +223,47 @@ export function printResult(
     return
   }
 
+  const colorize = (color: Color, text: string) =>
+    context.color ? `${ANSI_CODES[color]}${text}${ANSI_CODES.reset}` : text
+
+  if (result.command === 'messages-files' || result.command === 'channel-files') {
+    const rows = Array.isArray(result.data) ? (result.data as Record<string, unknown>[]) : []
+    const label = result.command === 'messages-files' ? 'Message files' : 'Channel files'
+    if (rows.length === 0) {
+      console.log(colorize('dim', `${label}: no items found`))
+      return
+    }
+    console.log(colorize('bold', `${label} (${rows.length})`))
+    for (const [position, row] of rows.entries()) {
+      const name = typeof row.name === 'string' ? row.name : 'attachment'
+      const type = typeof row.type === 'string' ? row.type : 'file'
+      const messageId = typeof row.messageId === 'string' ? row.messageId : 'unknown'
+      const index = typeof row.index === 'number' ? row.index : position
+      const host = typeof row.host === 'string' ? row.host : 'unknown'
+      console.log(
+        `${colorize('dim', `${String(position + 1).padStart(2, '0')}.`)} ${colorize('cyan', name)} [${type}]`,
+      )
+      console.log(`    messageId: ${messageId}, index: ${index}, host: ${host}`)
+      const resolved = [
+        typeof row.driveId === 'string' ? `driveId: ${row.driveId}` : undefined,
+        typeof row.itemId === 'string' ? `itemId: ${row.itemId}` : undefined,
+        typeof row.size === 'number' ? `size: ${row.size}` : undefined,
+        typeof row.blocksDownload === 'boolean'
+          ? `blocksDownload: ${row.blocksDownload}`
+          : undefined,
+      ].filter((value): value is string => value !== undefined)
+      if (resolved.length > 0) console.log(`    ${resolved.join(', ')}`)
+      const download = row.download as { path?: unknown; bytes?: unknown } | undefined
+      if (download && typeof download.path === 'string') {
+        const bytes = typeof download.bytes === 'number' ? download.bytes : 0
+        console.log(`    saved: ${download.path} (${bytes} bytes)`)
+      }
+      const error = typeof row.error === 'string' ? row.error : undefined
+      if (error) console.log(`    ${colorize('red', 'error:')} ${error}`)
+    }
+    return
+  }
+
   if (
     result.command === 'files' ||
     result.command === 'notebooks' ||
@@ -195,9 +272,6 @@ export function printResult(
     console.log(JSON.stringify(result.data, null, 2))
     return
   }
-
-  const colorize = (color: Color, text: string) =>
-    context.color ? `${ANSI_CODES[color]}${text}${ANSI_CODES.reset}` : text
 
   if (
     result.command === 'send' ||

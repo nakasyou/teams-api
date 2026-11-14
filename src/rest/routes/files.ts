@@ -10,6 +10,7 @@ import type {
   DriveItem,
   FileListOptions,
   FileReference,
+  MessageFileAttachment,
   ODataCollection,
   SharePointFileList,
   SharePointFileListOptions,
@@ -22,6 +23,7 @@ import {
   listQuery,
   validateServiceUrl,
 } from './content'
+import { attachmentReferences } from './attachments'
 
 export class TeamsFilesAPI {
   constructor(private readonly rest: RestClient) {}
@@ -127,6 +129,30 @@ export class TeamsFilesAPI {
     if ('siteUrl' in reference)
       return this.fetchSharePointItem(reference.siteUrl, reference.uniqueId)
     return this.fetch(reference.driveId, reference.itemId)
+  }
+
+  async resolveAttachment(attachment: MessageFileAttachment): Promise<DriveItem> {
+    const errors: string[] = []
+    for (const reference of attachmentReferences(attachment)) {
+      try {
+        return await this.resolve(reference)
+      } catch (error) {
+        errors.push(summarizeAttachmentError(error))
+      }
+    }
+    throw attachmentError('resolve', attachment, errors)
+  }
+
+  async downloadAttachment(attachment: MessageFileAttachment): Promise<Response> {
+    const errors: string[] = []
+    for (const reference of attachmentReferences(attachment)) {
+      try {
+        return await this.download(reference)
+      } catch (error) {
+        errors.push(summarizeAttachmentError(error))
+      }
+    }
+    throw attachmentError('download', attachment, errors)
   }
 
   async download(reference: FileReference): Promise<Response> {
@@ -447,4 +473,33 @@ export class TeamsFilesAPI {
     }
     return response
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+export function summarizeAttachmentError(error: unknown): string {
+  const message = errorMessage(error)
+  const lookup = /^Failed request \w+ (\/_api\/v2\.0\/(shares|sites)\/[^:\s]+):\s*(.+)$/.exec(
+    message,
+  )
+  if (lookup) {
+    const label = lookup[2] === 'shares' ? 'shares lookup' : 'site lookup'
+    return `${label}: ${lookup[3]!.trim()}`
+  }
+  return message
+    .replace(/\/_api\/v2\.0\/shares\/u![^/\s]*/g, '/_api/v2.0/shares/<shareId>')
+    .replace(/\btempauth=[^&\s]*/gi, 'tempauth=<redacted>')
+}
+
+function attachmentError(
+  action: 'resolve' | 'download',
+  attachment: MessageFileAttachment,
+  errors: string[],
+): Error {
+  if (errors.length === 0)
+    return new Error(`No SharePoint locator on attachment ${attachment.fileName}`)
+  const unique = [...new Set(errors)]
+  return new Error(`Could not ${action} attachment ${attachment.fileName}: ${unique.join('; ')}`)
 }

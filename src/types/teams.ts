@@ -478,6 +478,8 @@ export type ConversationMessagesMetadata = {
   lastCompleteSegmentStartTime?: number
   lastCompleteSegmentEndTime?: number
   syncState?: string
+  /** Full chatsvc URL for the next page of older messages. */
+  backwardLink?: string
   [key: string]: unknown
 }
 
@@ -512,6 +514,7 @@ export type ConversationMessageProperties = {
   mentions?: string
   languageStamp?: string
   edittime?: number
+  files?: string
   [key: string]: unknown
 }
 
@@ -540,7 +543,8 @@ export type ConversationActivity = {
 export type ChannelPostsResponse = {
   replyChains: ChannelReplyChain[]
   hasMore: boolean
-  lastModifiedTimeOfLastReturnedReplyChain: string | null
+  continuationToken?: string | null
+  lastModifiedTimeOfLastReturnedReplyChain?: string | null
   channelTenantId: string
 }
 

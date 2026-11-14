@@ -93,6 +93,8 @@ teams notifications --limit 50
 ```bash
 teams messages <conversationId>
 teams messages <conversationId> --limit 30
+teams messages files <conversationId> --limit 100
+teams messages files <conversationId> --message <messageId> --download ./attachments
 ```
 
 ### Channel messages
@@ -100,6 +102,8 @@ teams messages <conversationId> --limit 30
 ```bash
 teams channel messages <channelId>
 teams channel messages <channelId> --limit 30
+teams channel files <channelId> --limit 100
+teams channel files <channelId> --message <messageId> --download ./attachments
 ```
 
 ### Send messages, posts, replies, and DMs
@@ -154,6 +158,7 @@ teams class-notebook export <teamId-or-groupId> --output ./class-notebook
 - Notebook scopes accept team/group IDs, `me`, `user:<id>`, and `site:<hostname,siteCollectionId,siteId>`.
 - Full notebook export saves page HTML, resources, and `index.json`; OneNote packages are not ordinary downloadable files.
 - Downloads refuse to overwrite existing local files. Uploads default to conflict failure; use `--conflict replace` or `rename` explicitly.
+- `messages files` / `channel files` read the message's `properties.files` JSON and resolve each attachment through SharePoint. `--limit N` scans up to N messages across pages (default 20). Use `--no-resolve` to skip metadata requests and `--download <directory>` to save files. SharePoint download URLs (`tempauth`) are redacted from JSON output.
 - Match mutations to the user's requested scope. File deletion, notebook page deletion, and Class Notebook membership changes modify remote data.
 - Class-specific list/administration endpoints can return 403 when permissions are unavailable. The default notebook and ordinary notebook APIs may remain readable.
 
