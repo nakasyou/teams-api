@@ -391,6 +391,103 @@ describe('attachment CLI', () => {
     expect(requests.every((request) => request.method === 'GET')).toBe(true)
   })
 
+  test('keeps listing attachments when one locator returns 403', async () => {
+    mockFetch((url) => {
+      if (url.pathname.endsWith('/conversations/conv/messages'))
+        return json({
+          messages: [
+            {
+              id: 'message-blocked',
+              properties: { files: JSON.stringify([chatAttachment()]) },
+            },
+            {
+              id: 'message-ok',
+              properties: { files: JSON.stringify([channelAttachment()]) },
+            },
+          ],
+        })
+      if (url.hostname === 'contoso-my.sharepoint.com')
+        return new Response('forbidden', { status: 403, statusText: 'Forbidden' })
+      return json(driveItem(CHANNEL_FILE_URL))
+    })
+
+    const result = await executeCommand(parseArgs(['messages', 'files', 'conv']), client(), context)
+    const rows = result.data as Record<string, unknown>[]
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ messageId: 'message-blocked', name: 'Example.pdf' })
+    expect(rows[0]).not.toHaveProperty('driveId')
+    expect(typeof rows[0]?.error).toBe('string')
+    expect(String(rows[0]?.error)).toContain('403 Forbidden')
+    expect(String(rows[0]?.error)).not.toContain('u!')
+    expect(String(rows[0]?.error)).not.toContain('tempauth')
+    expect(rows[1]).toMatchObject({
+      messageId: 'message-ok',
+      name: '日本語 report.pdf',
+      driveId: 'b!drive',
+    })
+    expect(rows[1]).not.toHaveProperty('error')
+    expect(JSON.stringify(result)).not.toContain('u!')
+    expect(JSON.stringify(result)).not.toContain('tempauth')
+
+    const logs: string[] = []
+    const log = spyOn(console, 'log').mockImplementation((value) => logs.push(String(value)))
+    mocks.push(log)
+    printResult({ machine: false, color: false }, result, 'test')
+    expect(logs.join('\n')).toContain('403 Forbidden')
+    expect(logs.join('\n')).toContain('error:')
+  })
+
+  test('--download keeps successful rows when another download fails', async () => {
+    const root = await temp()
+    const directory = join(root, 'out')
+    const blocked = { ...chatAttachment(), fileName: 'blocked.pdf' }
+    const ok = { ...channelAttachment(), fileName: 'ok.pdf' }
+    mockFetch((url) => {
+      if (url.pathname.endsWith('/conversations/conv/messages'))
+        return json({
+          messages: [
+            {
+              id: 'message-blocked',
+              properties: { files: JSON.stringify([blocked]) },
+            },
+            {
+              id: 'message-ok',
+              properties: { files: JSON.stringify([ok]) },
+            },
+          ],
+        })
+      if (url.hostname === 'contoso-my.sharepoint.com')
+        return new Response('forbidden', { status: 403, statusText: 'Forbidden' })
+      if (url.pathname.includes('/shares/'))
+        return json(
+          driveItem(CHANNEL_FILE_URL, {
+            '@content.downloadUrlNoAuth':
+              'https://contoso.sharepoint.com/sites/team/_layouts/15/download.aspx?UniqueId=ok',
+          }),
+        )
+      return new Response('ok bytes')
+    })
+
+    const result = await executeCommand(
+      parseArgs(['messages', 'files', 'conv', '--download', directory]),
+      client(),
+      context,
+    )
+    const rows = result.data as Record<string, unknown>[]
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ messageId: 'message-blocked', name: 'blocked.pdf' })
+    expect(rows[0]).not.toHaveProperty('download')
+    expect(String(rows[0]?.error)).toContain('403 Forbidden')
+    expect(String(rows[0]?.error)).not.toContain('u!')
+    expect(String(rows[0]?.error)).not.toContain('tempauth')
+    expect(rows[1]).toMatchObject({ messageId: 'message-ok', name: 'ok.pdf' })
+    expect(rows[1]?.download).toMatchObject({ path: join(directory, 'ok.pdf') })
+    expect(await readdir(directory)).toEqual(['ok.pdf'])
+    expect(await readFile(join(directory, 'ok.pdf'), 'utf8')).toBe('ok bytes')
+    expect(JSON.stringify(result)).not.toContain('u!')
+    expect(JSON.stringify(result)).not.toContain('tempauth')
+  })
+
   test('--no-resolve only fetches messages and still reports the host', async () => {
     mockFetch((url) => {
       expect(url.pathname).toEndWith('/conversations/conv/messages')
@@ -462,7 +559,7 @@ describe('attachment CLI', () => {
     expect(requests.every((request) => request.method === 'GET')).toBe(true)
   })
 
-  test('--download saves attachments with sanitized names and never overwrites', async () => {
+  test('--download saves attachments with sanitized names and never overwrites existing files', async () => {
     const root = await temp()
     const directory = join(root, 'out')
     const attachment = { ...channelAttachment(), fileName: '../escape report.pdf' }
@@ -500,14 +597,55 @@ describe('attachment CLI', () => {
     expect(JSON.stringify(result)).not.toContain('tempauth')
     expect(requests.every((request) => request.method === 'GET')).toBe(true)
 
-    await expect(
-      executeCommand(
-        parseArgs(['messages', 'files', 'conv', '--download', directory]),
-        client(),
-        context,
-      ),
-    ).rejects.toThrow()
+    await executeCommand(
+      parseArgs(['messages', 'files', 'conv', '--download', directory]),
+      client(),
+      context,
+    )
+    const after = await readdir(directory)
+    expect(after).toHaveLength(2)
+    expect(new Set(after).size).toBe(2)
+    expect(after.some((name) => name.endsWith(' (1).pdf'))).toBe(true)
     expect(await readFile(join(directory, names[0]!), 'utf8')).toBe('downloaded bytes')
+  })
+
+  test('--download saves duplicate attachment names to distinct paths', async () => {
+    const root = await temp()
+    const directory = join(root, 'out')
+    const attachment = { ...channelAttachment(), fileName: 'report.pdf' }
+    mockFetch((url) => {
+      if (url.pathname.endsWith('/conversations/conv/messages'))
+        return json({
+          messages: [
+            {
+              id: 'message-1',
+              properties: { files: JSON.stringify([attachment, attachment]) },
+            },
+          ],
+        })
+      if (url.pathname.includes('/shares/'))
+        return json(
+          driveItem(CHANNEL_FILE_URL, {
+            '@content.downloadUrlNoAuth':
+              'https://contoso.sharepoint.com/sites/team/_layouts/15/download.aspx?UniqueId=1',
+          }),
+        )
+      return new Response('downloaded bytes')
+    })
+
+    const result = await executeCommand(
+      parseArgs(['messages', 'files', 'conv', '--download', directory]),
+      client(),
+      context,
+    )
+    const names = (await readdir(directory)).sort()
+    expect(names).toEqual(['report (1).pdf', 'report.pdf'])
+    expect(await readFile(join(directory, names[0]!), 'utf8')).toBe('downloaded bytes')
+    expect(await readFile(join(directory, names[1]!), 'utf8')).toBe('downloaded bytes')
+    const rows = result.data as { download?: { path: string } }[]
+    expect(rows).toHaveLength(2)
+    expect(rows[0]?.download?.path).toBe(join(directory, 'report.pdf'))
+    expect(rows[1]?.download?.path).toBe(join(directory, 'report (1).pdf'))
   })
 
   test('redacts existing files get/path/resolve/list/search/channel output', async () => {

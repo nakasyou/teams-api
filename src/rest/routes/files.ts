@@ -137,7 +137,7 @@ export class TeamsFilesAPI {
       try {
         return await this.resolve(reference)
       } catch (error) {
-        errors.push(errorMessage(error))
+        errors.push(summarizeAttachmentError(error))
       }
     }
     throw attachmentError('resolve', attachment, errors)
@@ -149,7 +149,7 @@ export class TeamsFilesAPI {
       try {
         return await this.download(reference)
       } catch (error) {
-        errors.push(errorMessage(error))
+        errors.push(summarizeAttachmentError(error))
       }
     }
     throw attachmentError('download', attachment, errors)
@@ -479,6 +479,20 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+export function summarizeAttachmentError(error: unknown): string {
+  const message = errorMessage(error)
+  const lookup = /^Failed request \w+ (\/_api\/v2\.0\/(shares|sites)\/[^:\s]+):\s*(.+)$/.exec(
+    message,
+  )
+  if (lookup) {
+    const label = lookup[2] === 'shares' ? 'shares lookup' : 'site lookup'
+    return `${label}: ${lookup[3]!.trim()}`
+  }
+  return message
+    .replace(/\/_api\/v2\.0\/shares\/u![^/\s]*/g, '/_api/v2.0/shares/<shareId>')
+    .replace(/\btempauth=[^&\s]*/gi, 'tempauth=<redacted>')
+}
+
 function attachmentError(
   action: 'resolve' | 'download',
   attachment: MessageFileAttachment,
@@ -486,5 +500,6 @@ function attachmentError(
 ): Error {
   if (errors.length === 0)
     return new Error(`No SharePoint locator on attachment ${attachment.fileName}`)
-  return new Error(`Could not ${action} attachment ${attachment.fileName}: ${errors.join('; ')}`)
+  const unique = [...new Set(errors)]
+  return new Error(`Could not ${action} attachment ${attachment.fileName}: ${unique.join('; ')}`)
 }

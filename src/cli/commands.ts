@@ -1,4 +1,5 @@
-import { resolve as resolvePath } from 'node:path'
+import { access } from 'node:fs/promises'
+import { parse as parsePath, resolve as resolvePath } from 'node:path'
 import { TeamsClient } from '../client'
 import type { CliCommandResult, ParsedArgs, RenderContext } from './types'
 import { parseLimitArgs, parseMessageFilesArgs } from './args'
@@ -6,6 +7,7 @@ import { withSpinner } from './output'
 import type { Channel, DriveItem, MessageFileAttachment, Team, TeamsExport } from '../types'
 import { executeContentCommand, safeJoin, safeLabel, saveResponse } from './content'
 import { attachmentReference, parseMessageFiles, redactDriveItem } from '../rest/routes/attachments'
+import { summarizeAttachmentError } from '../rest/routes/files'
 
 export async function executeCommand(
   args: ParsedArgs,
@@ -231,6 +233,7 @@ type MessageFileRow = {
   blocksDownload?: boolean
   item?: DriveItem
   download?: { path: string; bytes: number }
+  error?: string
 }
 
 type MessageWithFiles = {
@@ -285,20 +288,31 @@ async function executeMessageFiles(
             type: attachment.fileType ?? attachment.type,
             host: attachmentHost(attachment),
           }
+          let resolved = false
           if (parsed.resolve) {
-            const item = await client.teams.files.resolveAttachment(attachment)
-            row.driveId = item.parentReference?.driveId
-            row.itemId = item.id
-            row.size = item.size
-            row.blocksDownload = item.currentUserRole?.blocksDownload
-            row.item = redactDriveItem(item)
+            try {
+              const item = await client.teams.files.resolveAttachment(attachment)
+              row.driveId = item.parentReference?.driveId
+              row.itemId = item.id
+              row.size = item.size
+              row.blocksDownload = item.currentUserRole?.blocksDownload
+              row.item = redactDriveItem(item)
+              resolved = true
+            } catch (error) {
+              row.error = summarizeAttachmentError(error)
+            }
           }
-          if (directory) {
-            const path = safeJoin(directory, safeLabel(attachment.fileName))
-            row.download = await saveResponse(
-              await client.teams.files.downloadAttachment(attachment),
-              path,
-            )
+          if (directory && (!parsed.resolve || resolved)) {
+            try {
+              const path = await uniqueDownloadPath(directory, attachment.fileName)
+              row.download = await saveResponse(
+                await client.teams.files.downloadAttachment(attachment),
+                path,
+              )
+            } catch (error) {
+              const message = summarizeAttachmentError(error)
+              row.error = row.error ? `${row.error}; ${message}` : message
+            }
           }
           rows.push(row)
         }
@@ -306,6 +320,35 @@ async function executeMessageFiles(
       return { command, data: rows }
     },
   )
+}
+
+async function uniqueDownloadPath(directory: string, fileName: string): Promise<string> {
+  const label = safeLabel(fileName)
+  const { name, ext } = parsePath(label)
+  let candidate = safeJoin(directory, label)
+  let suffix = 0
+  while (await fileExists(candidate)) {
+    suffix += 1
+    candidate = safeJoin(directory, `${name} (${suffix})${ext}`)
+  }
+  return candidate
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'ENOENT'
+    ) {
+      return false
+    }
+    throw error
+  }
 }
 
 async function fetchChannelFileMessages(

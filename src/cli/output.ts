@@ -247,6 +247,8 @@ export function printResult(
         const bytes = typeof download.bytes === 'number' ? download.bytes : 0
         console.log(`    saved: ${download.path} (${bytes} bytes)`)
       }
+      const error = typeof row.error === 'string' ? row.error : undefined
+      if (error) console.log(`    ${colorize('red', 'error:')} ${error}`)
     }
     return
   }
