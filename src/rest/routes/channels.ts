@@ -7,16 +7,14 @@ export const MAX_CHANNEL_MESSAGE_PAGES = 50
 export type ChannelQueryOptions = {
   pageSize?: number
   /**
-   * Cursor for older reply chains.
+   * Opaque cursor returned as `continuationToken` by the previous CSA channel
+   * response.
    *
-   * The downloaded Teams web client bundles contain `hasMore` and
-   * `lastModifiedTimeOfLastReturnedReplyChain` response handling in the CSA
-   * reply-chain types, but the bundles available in
-   * /workspace/teams-api-issue3-analysis/js/pretty/ do not include the CSA
-   * request builder or this query parameter. The parameter name below mirrors
-   * the response field and has not been verified against the web client JS.
+   * The cursor is the response's `continuationToken`, verified against the live
+   * CSA API with read-only requests. It is not found in the downloaded
+   * web-client bundles.
    */
-  lastModifiedTimeOfLastReturnedReplyChain?: string
+  continuationToken?: string
 }
 
 export type ChannelMessagePagesOptions = ChannelQueryOptions & {
@@ -39,9 +37,8 @@ export const fetchChannel = async (
 ): Promise<ChannelPostsResponse> => {
   const pageSize = options?.pageSize ?? 20
   const query: Record<string, string | number> = { pageSize }
-  if (options?.lastModifiedTimeOfLastReturnedReplyChain) {
-    query.lastModifiedTimeOfLastReturnedReplyChain =
-      options.lastModifiedTimeOfLastReturnedReplyChain
+  if (options?.continuationToken) {
+    query.continuationToken = options.continuationToken
   }
 
   return rest.request<ChannelPostsResponse>(
@@ -84,12 +81,12 @@ export const fetchChannelMessages = async (
 }
 
 /**
- * Fetch channel reply chains across pages, following `hasMore` with the
- * `lastModifiedTimeOfLastReturnedReplyChain` cursor.
+ * Fetch channel reply chains across pages, following `hasMore` and the
+ * `continuationToken` returned by each response.
  *
- * See `ChannelQueryOptions` for the evidence gap: the web client JS available
- * locally does not show the CSA next-page query parameter, so the request
- * cursor name is inferred from the response shape.
+ * The cursor is the response's `continuationToken`, verified against the live
+ * CSA API with read-only requests. It is not found in the downloaded
+ * web-client bundles.
  */
 export const fetchChannelMessagePages = async (
   rest: RestClient,
@@ -104,7 +101,7 @@ export const fetchChannelMessagePages = async (
   const messages: ChannelPostMessage[] = []
   const seenMessageIds = new Set<string>()
   const seenCursors = new Set<string>()
-  let cursor = options?.lastModifiedTimeOfLastReturnedReplyChain
+  let cursor = options?.continuationToken
   if (cursor) seenCursors.add(cursor)
   let pages = 0
 
@@ -114,13 +111,13 @@ export const fetchChannelMessagePages = async (
     }
     const posts = await fetchChannel(rest, teamId, channelId, {
       pageSize: options?.pageSize,
-      lastModifiedTimeOfLastReturnedReplyChain: cursor,
+      continuationToken: cursor,
     })
     pages += 1
     appendMessages(messages, flattenChannelMessages(posts), maxMessages, seenMessageIds)
 
     if (messages.length >= maxMessages || !posts.hasMore) break
-    const nextCursor = posts.lastModifiedTimeOfLastReturnedReplyChain
+    const nextCursor = posts.continuationToken
     if (!nextCursor) break
     if (seenCursors.has(nextCursor)) {
       throw new Error('Repeated channel message pagination cursor')

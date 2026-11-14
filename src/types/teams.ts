@@ -543,7 +543,8 @@ export type ConversationActivity = {
 export type ChannelPostsResponse = {
   replyChains: ChannelReplyChain[]
   hasMore: boolean
-  lastModifiedTimeOfLastReturnedReplyChain: string | null
+  continuationToken?: string | null
+  lastModifiedTimeOfLastReturnedReplyChain?: string | null
   channelTenantId: string
 }
 

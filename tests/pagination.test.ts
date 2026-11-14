@@ -170,45 +170,89 @@ describe('conversation message pagination', () => {
 })
 
 describe('channel message pagination', () => {
-  test('follows hasMore with the reply-chain cursor until enough messages are scanned', async () => {
+  test('follows continuationToken across pages until hasMore is false', async () => {
     mockFetch((url) => {
-      const cursor = url.searchParams.get('lastModifiedTimeOfLastReturnedReplyChain')
-      if (cursor === 'cursor-1') {
+      const token = url.searchParams.get('continuationToken')
+      if (token === 'token-1') {
         return json({
           replyChains: [{ messages: [message('c3'), message('c4')] }],
           hasMore: false,
-          lastModifiedTimeOfLastReturnedReplyChain: null,
+          continuationToken: null,
         })
       }
       return json({
         replyChains: [{ messages: [message('c1'), message('c2')] }],
         hasMore: true,
-        lastModifiedTimeOfLastReturnedReplyChain: 'cursor-1',
+        continuationToken: 'token-1',
       })
     })
 
     const result = await client().teams.channels.fetchMessagePages('team-1', 'channel-1', {
       pageSize: 2,
-      maxMessages: 3,
+      maxMessages: 10,
     })
 
-    expect(result.messages.map((item) => item.id)).toEqual(['c1', 'c2', 'c3'])
+    expect(result.messages.map((item) => item.id)).toEqual(['c1', 'c2', 'c3', 'c4'])
     expect(result.pages).toBe(2)
     expect(requests).toHaveLength(2)
-    expect(requests[0]?.url.searchParams.get('lastModifiedTimeOfLastReturnedReplyChain')).toBeNull()
-    expect(requests[1]?.url.searchParams.get('lastModifiedTimeOfLastReturnedReplyChain')).toBe(
-      'cursor-1',
-    )
+    expect(requests[0]?.url.searchParams.get('continuationToken')).toBeNull()
+    expect(requests[1]?.url.searchParams.get('continuationToken')).toBe('token-1')
     expect(requests[1]?.url.searchParams.get('pageSize')).toBe('2')
+    expect(
+      requests.some((request) =>
+        request.url.searchParams.has('lastModifiedTimeOfLastReturnedReplyChain'),
+      ),
+    ).toBe(false)
     expect(requests.every((request) => request.method === 'GET')).toBe(true)
   })
 
-  test('throws on a repeated reply-chain cursor', async () => {
+  test('stops when hasMore is false even with a continuationToken', async () => {
+    mockFetch(() =>
+      json({
+        replyChains: [{ messages: [message('c1')] }],
+        hasMore: false,
+        continuationToken: 'unused-token',
+      }),
+    )
+
+    const result = await client().teams.channels.fetchMessagePages('team-1', 'channel-1', {
+      pageSize: 1,
+      maxMessages: 10,
+    })
+
+    expect(result.messages.map((item) => item.id)).toEqual(['c1'])
+    expect(result.pages).toBe(1)
+    expect(requests).toHaveLength(1)
+    expect(requests.every((request) => request.method === 'GET')).toBe(true)
+  })
+
+  test('stops when hasMore is true but continuationToken is missing', async () => {
     mockFetch(() =>
       json({
         replyChains: [{ messages: [message('c1')] }],
         hasMore: true,
-        lastModifiedTimeOfLastReturnedReplyChain: 'same-cursor',
+      }),
+    )
+
+    const result = await client().teams.channels.fetchMessagePages('team-1', 'channel-1', {
+      pageSize: 1,
+      maxMessages: 10,
+    })
+
+    expect(result.messages.map((item) => item.id)).toEqual(['c1'])
+    expect(result.pages).toBe(1)
+    expect(requests).toHaveLength(1)
+    expect(requests.every((request) => request.method === 'GET')).toBe(true)
+  })
+
+  test('throws on a repeated continuationToken', async () => {
+    mockFetch((url) =>
+      json({
+        replyChains: [
+          { messages: [message(url.searchParams.has('continuationToken') ? 'c2' : 'c1')] },
+        ],
+        hasMore: true,
+        continuationToken: 'same-token',
       }),
     )
 
@@ -219,6 +263,7 @@ describe('channel message pagination', () => {
       }),
     ).rejects.toThrow('Repeated channel message pagination cursor')
     expect(requests).toHaveLength(2)
+    expect(requests[1]?.url.searchParams.get('continuationToken')).toBe('same-token')
     expect(requests.every((request) => request.method === 'GET')).toBe(true)
   })
 
@@ -229,7 +274,7 @@ describe('channel message pagination', () => {
       return json({
         replyChains: [{ messages: [message(`c${page}`)] }],
         hasMore: true,
-        lastModifiedTimeOfLastReturnedReplyChain: `cursor-${page}`,
+        continuationToken: `token-${page}`,
       })
     })
 
@@ -241,5 +286,32 @@ describe('channel message pagination', () => {
       }),
     ).rejects.toThrow('Channel message pagination exceeded 2 pages')
     expect(requests).toHaveLength(2)
+    expect(requests.every((request) => request.method === 'GET')).toBe(true)
+  })
+
+  test('deduplicates message ids across pages', async () => {
+    mockFetch((url) =>
+      url.searchParams.get('continuationToken') === 'token-1'
+        ? json({
+            replyChains: [{ messages: [message('c2'), message('c3')] }],
+            hasMore: false,
+            continuationToken: null,
+          })
+        : json({
+            replyChains: [{ messages: [message('c1'), message('c2')] }],
+            hasMore: true,
+            continuationToken: 'token-1',
+          }),
+    )
+
+    const result = await client().teams.channels.fetchMessagePages('team-1', 'channel-1', {
+      pageSize: 2,
+      maxMessages: 10,
+    })
+
+    expect(result.messages.map((item) => item.id)).toEqual(['c1', 'c2', 'c3'])
+    expect(result.pages).toBe(2)
+    expect(requests).toHaveLength(2)
+    expect(requests.every((request) => request.method === 'GET')).toBe(true)
   })
 })
