@@ -272,8 +272,12 @@ async function executeMessageFiles(
     async () => {
       const messages: MessageWithFiles[] =
         kind === 'messages'
-          ? (await client.teams.conversations.fetchMessages(targetId, { pageSize: parsed.limit }))
-              .messages
+          ? (
+              await client.teams.conversations.fetchMessagePages(targetId, {
+                pageSize: Math.min(parsed.limit, 200),
+                maxMessages: parsed.limit,
+              })
+            ).messages
           : await fetchChannelFileMessages(client, targetId, parsed.limit)
 
       const rows: MessageFileRow[] = []
@@ -363,7 +367,11 @@ async function fetchChannelFileMessages(
     throw new Error(`Ambiguous channel: ${channelId} exists in multiple teams`)
   const [teamId] = teamIds
   if (!teamId) throw new Error(`Channel not found: ${channelId}`)
-  return client.teams.channels.fetchMessages(teamId, channelId, { pageSize: limit })
+  const result = await client.teams.channels.fetchMessagePages(teamId, channelId, {
+    pageSize: limit,
+    maxMessages: limit,
+  })
+  return result.messages
 }
 
 function attachmentHost(attachment: MessageFileAttachment): string | undefined {

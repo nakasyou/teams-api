@@ -478,6 +478,8 @@ export type ConversationMessagesMetadata = {
   lastCompleteSegmentStartTime?: number
   lastCompleteSegmentEndTime?: number
   syncState?: string
+  /** Full chatsvc URL for the next page of older messages. */
+  backwardLink?: string
   [key: string]: unknown
 }
 

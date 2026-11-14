@@ -4,10 +4,17 @@ import { TeamsFilesAPI } from '../rest/routes/files'
 import { TeamsNotebooksAPI, TeamsClassNotebooksAPI } from '../rest/routes/notebooks'
 import {
   fetchChannel,
+  fetchChannelMessagePages,
   fetchChannelMessages,
+  type ChannelMessagePages,
+  type ChannelMessagePagesOptions,
   type ChannelQueryOptions,
 } from '../rest/routes/channels'
-import { fetchConversationMessages } from '../rest/routes/conversations'
+import {
+  fetchConversationMessagePages,
+  fetchConversationMessages,
+  type ConversationMessagePagesOptions,
+} from '../rest/routes/conversations'
 import {
   fetchCurrentUser,
   fetchPinnedChannels,
@@ -24,12 +31,22 @@ import type {
   TeamsExport,
 } from '../types'
 
-export type { ChannelQueryOptions, FetchShortProfileOptions }
+export type {
+  ChannelMessagePages,
+  ChannelMessagePagesOptions,
+  ChannelQueryOptions,
+  ConversationMessagePagesOptions,
+  FetchShortProfileOptions,
+}
 
 export interface TeamsConversationsAPI {
   fetchMessages(
     conversationId: string,
     options?: ConversationMessagesOptions,
+  ): Promise<ConversationMessagesResponse>
+  fetchMessagePages(
+    conversationId: string,
+    options?: ConversationMessagePagesOptions,
   ): Promise<ConversationMessagesResponse>
 }
 
@@ -50,6 +67,11 @@ export interface TeamsChannelsAPI {
     channelId: string,
     options?: ChannelQueryOptions,
   ): Promise<ChannelPostMessage[]>
+  fetchMessagePages(
+    teamId: string,
+    channelId: string,
+    options?: ChannelMessagePagesOptions,
+  ): Promise<ChannelMessagePages>
 }
 
 export interface TeamsUsersMeAPI {
@@ -89,6 +111,8 @@ export class TeamsClient {
       conversations: {
         fetchMessages: (conversationId, options) =>
           this.fetchConversationMessages(conversationId, options),
+        fetchMessagePages: (conversationId, options) =>
+          this.fetchConversationMessagePages(conversationId, options),
       },
       notifications: {
         fetchMessages: (options) => this.fetchConversationMessages('48:notifications', options),
@@ -99,6 +123,8 @@ export class TeamsClient {
         fetch: (teamId, channelId, options) => this.fetchChannel(teamId, channelId, options),
         fetchMessages: (teamId, channelId, options) =>
           this.fetchChannelMessages(teamId, channelId, options),
+        fetchMessagePages: (teamId, channelId, options) =>
+          this.fetchChannelMessagePages(teamId, channelId, options),
       },
       users: {
         fetchShortProfile: (mriOrEmailArray, options) =>
@@ -118,6 +144,13 @@ export class TeamsClient {
     return fetchConversationMessages(this.rest, conversationId, options)
   }
 
+  private async fetchConversationMessagePages(
+    conversationId: string,
+    options?: ConversationMessagePagesOptions,
+  ): Promise<ConversationMessagesResponse> {
+    return fetchConversationMessagePages(this.rest, conversationId, options)
+  }
+
   private async fetchChannel(
     teamId: string,
     channelId: string,
@@ -132,6 +165,14 @@ export class TeamsClient {
     options?: ChannelQueryOptions,
   ): Promise<ChannelPostMessage[]> {
     return fetchChannelMessages(this.rest, teamId, channelId, options)
+  }
+
+  private async fetchChannelMessagePages(
+    teamId: string,
+    channelId: string,
+    options?: ChannelMessagePagesOptions,
+  ): Promise<ChannelMessagePages> {
+    return fetchChannelMessagePages(this.rest, teamId, channelId, options)
   }
 
   private async fetchShortProfile(

@@ -9,7 +9,7 @@ const basicCommands = [
   ['teams messages <conversationId> [--limit N]', 'Fetch messages from a chat or conversation.'],
   [
     'teams messages files <conversationId> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]',
-    'List files attached to conversation messages, resolving SharePoint locators by default. --message filters to one message; --no-resolve skips metadata resolution; --download saves files without overwriting and never prints download URLs.',
+    'List files attached to conversation messages, resolving SharePoint locators by default. --limit N scans up to N messages across pages (default 20); --message filters to one message; --no-resolve skips metadata resolution; --download saves files without overwriting and never prints download URLs.',
   ],
   [
     'teams channel messages <channelId> [--limit N]',
@@ -17,7 +17,7 @@ const basicCommands = [
   ],
   [
     'teams channel files <channelId> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]',
-    'Resolve the owning team and list files attached to channel posts. --message filters to one post; --no-resolve skips metadata resolution; --download saves files without overwriting and never prints download URLs.',
+    'Resolve the owning team and list files attached to channel posts. --limit N scans up to N messages across pages (default 20); --message filters to one post; --no-resolve skips metadata resolution; --download saves files without overwriting and never prints download URLs.',
   ],
   ['teams teams list', 'List joined teams, including their thread IDs.'],
   ['teams teams channels <teamId>', 'List the channels belonging to a Teams thread ID.'],

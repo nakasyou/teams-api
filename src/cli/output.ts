@@ -69,6 +69,7 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
       '  teams messages files <conversationId> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]',
     )
     console.log('  List files attached to conversation messages')
+    console.log('  --limit N scans up to N messages across pages (default 20)')
     console.log('  --message filters to one message; --no-resolve lists metadata only')
     console.log('  --download saves each file into the directory without overwriting')
     return
@@ -97,6 +98,7 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
       '  teams channel files <channelId> [--message <messageId>] [--limit N] [--no-resolve] [--download <directory>]',
     )
     console.log('  List files attached to channel posts')
+    console.log('  --limit N scans up to N messages across pages (default 20)')
     console.log('  The owning team is resolved from the current user')
     console.log('  --download saves each file into the directory without overwriting')
     return
@@ -165,11 +167,11 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  notifications [--limit N]           Fetch latest notifications')
     console.log('  messages <conversationId> [--limit N]   Fetch conversation messages')
     console.log(
-      '  messages files <conversationId> [--no-resolve] [--download <dir>] List/download message attachments',
+      '  messages files <conversationId> [--limit N] [--no-resolve] [--download <dir>] List/download message attachments',
     )
     console.log('  channel messages <channelId> [--limit N] Fetch channel messages')
     console.log(
-      '  channel files <channelId> [--no-resolve] [--download <dir>] List/download channel attachments',
+      '  channel files <channelId> [--limit N] [--no-resolve] [--download <dir>] List/download channel attachments',
     )
     console.log('  teams list                          List all teams for the current user')
     console.log('  teams channels <teamId>             List channels in a team')

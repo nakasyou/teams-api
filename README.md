@@ -102,9 +102,10 @@ teams files download "https://example.sharepoint.com/sites/class/Shared%20Docume
 teams files download-folder <driveId> <folderItemId> --output ./downloads
 
 # List and save files attached to chat messages or channel posts
-teams messages files <conversationId>
+# --limit N scans up to N messages across pages (default: 20)
+teams messages files <conversationId> --limit 100
 teams messages files <conversationId> --message <messageId> --download ./attachments
-teams channel files <channelId>
+teams channel files <channelId> --limit 100
 teams channel files <channelId> --message <messageId> --download ./attachments
 
 # Browse SharePoint directly, including all nested folders
@@ -126,7 +127,7 @@ teams files delete <driveId> <itemId>
 
 Downloads preserve binary content, stream to disk, and refuse to overwrite existing local files. Folder downloads include all nested folders. OneNote packages use the notebook export commands below. Uploads default to `--conflict fail`; `replace` and `rename` are explicit alternatives. Files over 4 MiB use sequential upload-session chunks. `--if-match` is available for upload, replacement, rename, move, and deletion.
 
-`messages files` and `channel files` parse the `properties.files` JSON embedded in messages. Each attachment is resolved through its SharePoint sharing URL, file URL, or site/item locator, using a token scoped to the file's own origin (including personal `*-my.sharepoint.com` sites for chats). `--no-resolve` lists attachment metadata without extra requests. `--download` saves every attachment into the directory using sanitized names and never overwrites an existing file. Download URLs containing `tempauth` are always redacted from JSON output.
+`messages files` and `channel files` parse the `properties.files` JSON embedded in messages. `--limit N` is the number of messages to scan (default 20); the commands follow chat `backwardLink` and channel reply-chain cursors across pages until they have scanned enough messages. Each attachment is resolved through its SharePoint sharing URL, file URL, or site/item locator, using a token scoped to the file's own origin (including personal `*-my.sharepoint.com` sites for chats). `--no-resolve` lists attachment metadata without extra requests. `--download` saves every attachment into the directory using sanitized names and never overwrites an existing file. Download URLs containing `tempauth` are always redacted from JSON output.
 
 #### OneNote and Class Notebook
 

@@ -7,12 +7,21 @@ export type CliExecution = {
 }
 export type CliRunner = (args: string[], signal?: AbortSignal) => Promise<CliExecution>
 
-export function createCliRunner(cliPath: string, baseArgs: string[] = []): CliRunner {
+export type CliRunnerOptions = {
+  /** Extra runtime arguments inserted before the CLI script (for example --preload). */
+  execArgs?: string[]
+}
+
+export function createCliRunner(
+  cliPath: string,
+  baseArgs: string[] = [],
+  options: CliRunnerOptions = {},
+): CliRunner {
   return (args, signal) =>
     new Promise((resolve, reject) => {
       const child = spawn(
         process.execPath,
-        [cliPath, '--json', '--no-color', ...baseArgs, ...args],
+        [...(options.execArgs ?? []), cliPath, '--json', '--no-color', ...baseArgs, ...args],
         {
           stdio: ['ignore', 'pipe', 'pipe'],
           signal,
