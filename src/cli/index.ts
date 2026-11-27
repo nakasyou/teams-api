@@ -44,6 +44,7 @@ async function runCli(argv: string[]): Promise<void> {
       const profileJson = values['profile-json'] ?? args.profileJsonPath
       if (profileJson) baseArgs.push('--profile-json', profileJson)
       if (args.estsAuthPersistent) baseArgs.push('--ests-auth-persistent', args.estsAuthPersistent)
+      if (args.estsAuth) baseArgs.push('--ests-auth', args.estsAuth)
       if (args.refreshToken) baseArgs.push('--refresh-token', args.refreshToken)
       const { startTeamsMcpServer } = await import('../mcp/start')
       await startTeamsMcpServer(fileURLToPath(import.meta.url), baseArgs)

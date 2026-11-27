@@ -15,6 +15,7 @@ const GLOBAL_OPTION_CONFIG = {
   'profile-json': { type: 'string' },
   'refresh-token': { type: 'string' },
   'ests-auth-persistent': { type: 'string' },
+  'ests-auth': { type: 'string' },
 } as const
 
 const LIMIT_OPTION_CONFIG = {
@@ -29,6 +30,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     profileName: DEFAULT_PROFILE_NAME,
     profileJsonPath: undefined,
     estsAuthPersistent: undefined,
+    estsAuth: undefined,
     refreshToken: undefined,
     jsonOutput: false,
     noColor: false,
@@ -95,6 +97,13 @@ export function parseArgs(argv: string[]): ParsedArgs {
       parsed.estsAuthPersistent = token.value
       continue
     }
+    if (token.name === 'ests-auth') {
+      if (typeof token.value !== 'string' || token.value.length === 0) {
+        throw new Error('Missing --ests-auth value')
+      }
+      parsed.estsAuth = token.value
+      continue
+    }
 
     throw new Error(`Unknown option: ${input}`)
   }
@@ -119,6 +128,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       options: {
         'tenant-id': { type: 'string' },
         'ests-auth-persistent': { type: 'string' },
+        'ests-auth': { type: 'string' },
         'refresh-token': { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
@@ -128,6 +138,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       parsed.tenantId = values['tenant-id']
     }
     parsed.estsAuthPersistent = values['ests-auth-persistent'] ?? parsed.estsAuthPersistent
+    parsed.estsAuth = values['ests-auth'] ?? parsed.estsAuth
     parsed.refreshToken = values['refresh-token'] ?? parsed.refreshToken
     parsed.showHelp = values.help ?? parsed.showHelp
     parsed.commandArgs = []
