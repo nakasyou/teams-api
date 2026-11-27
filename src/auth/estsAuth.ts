@@ -49,6 +49,7 @@ function normalizeCookie(value: string): string {
 export async function loginFromEstsAuthPersistent(
   ESTSAUTHPERSISTENT: string,
   tenantId?: string,
+  ESTSAUTH?: string,
 ): Promise<LoginFromEstsAuthResponse> {
   const resolvedTenantId = resolveTenantId(tenantId)
   const authCookie = normalizeCookie(ESTSAUTHPERSISTENT)
@@ -57,8 +58,15 @@ export async function loginFromEstsAuthPersistent(
   }
 
   const AADSSO = 'NA|NoExtension'
+  let cookieHeader = `AADSSO=${AADSSO}; ESTSAUTHPERSISTENT=${authCookie};`
+  if (ESTSAUTH) {
+    const sessionCookie = normalizeCookie(ESTSAUTH)
+    if (sessionCookie) {
+      cookieHeader = `AADSSO=${AADSSO}; ESTSAUTH=${sessionCookie}; ESTSAUTHPERSISTENT=${authCookie};`
+    }
+  }
   const headers = new Headers({
-    cookie: `AADSSO=${AADSSO}; ESTSAUTHPERSISTENT=${authCookie};`,
+    cookie: cookieHeader,
     'user-agent':
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
   })
@@ -108,7 +116,9 @@ export async function loginFromEstsAuthPersistent(
   const params = new URLSearchParams(locURLHash.slice(1))
   const code = params.get('code')
   if (!code) {
-    throw new Error('No code in location hash')
+    const error = params.get('error') ?? 'unknown'
+    const description = params.get('error_description') ?? 'No code in location hash'
+    throw new Error(`Silent SSO failed (${error}): ${description}`)
   }
 
   const tokenFormData = new URLSearchParams()

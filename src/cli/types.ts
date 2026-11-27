@@ -28,6 +28,7 @@ export type ParsedArgs = {
   profileName: string
   profileJsonPath: string | undefined
   estsAuthPersistent: string | undefined
+  estsAuth: string | undefined
   refreshToken: string | undefined
   jsonOutput: boolean
   noColor: boolean
@@ -53,4 +54,5 @@ export type ResolvedProfile = {
   refreshTokenExpiresIn?: number
   refreshTokenUpdatedAt?: number
   ESTSAUTHPERSISTENT?: string
+  ESTSAUTH?: string
 }

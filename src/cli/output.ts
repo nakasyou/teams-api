@@ -157,6 +157,7 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  --profile=<name>         Use ~/.teams-cli/<name>.json (default: default)')
     console.log('  --profile-json=<path>    Use custom profile json path')
     console.log('  --ests-auth-persistent=<token>  Preferred: generate token from session cookie')
+    console.log('  --ests-auth=<token>              Session cookie (ESTSAUTH) for silent SSO')
     console.log('  --refresh-token=<token>          Deprecated: use --ests-auth-persistent instead')
     console.log(
       '  --json                   Output machine-readable JSON only (default in automation)',
@@ -186,7 +187,7 @@ export function printHelp(context: RenderContext, command?: string, compact = fa
     console.log('  teams channels <teamId>             List channels in a team')
     console.log('  me                                  Fetch current user snapshot')
     console.log(
-      '  login [--tenant-id=<id>] [--ests-auth-persistent=<token>] Save tenant and session token',
+      '  login [--tenant-id=<id>] [--ests-auth-persistent=<token>] [--ests-auth=<token>] Save tenant and session token',
     )
   }
 }
