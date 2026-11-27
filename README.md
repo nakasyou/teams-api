@@ -59,7 +59,8 @@ teams login --ests-auth-persistent=<ESTSAUTHPERSISTENT>
   3. Open DevTools, go to the `Application` tab, then `Cookies`
   4. Copy the `ESTSAUTHPERSISTENT` cookie value and paste it into the `teams login` prompt
 - You can also pass token via `--ests-auth-persistent` or `ESTSAUTHPERSISTENT`
-- The default profile stores `refreshToken`, `refreshTokenExpiresIn`, and `ESTSAUTHPERSISTENT`.
+- If login fails with `login_required` (AADSTS50058), also copy the `ESTSAUTH` cookie from the same page and pass it with `--ests-auth` or `ESTSAUTH`
+- The default profile stores `refreshToken`, `refreshTokenExpiresIn`, `ESTSAUTHPERSISTENT`, and `ESTSAUTH`.
 
 `refresh_token` is deprecated and will continue to work for backward compatibility.
 ( `--refresh-token` / `REFRESH_TOKEN` are deprecated in favor of `ESTSAUTHPERSISTENT`)
@@ -217,6 +218,7 @@ Run `teams files --help`, `teams notebooks --help`, or `teams class-notebook --h
 - `--profile=<name>`: use another local profile name
 - `--profile-json=<path>`: use a custom profile JSON file
 - `--ests-auth-persistent=<token>`: set session token for current run (recommended)
+- `--ests-auth=<token>`: set ESTSAUTH session cookie for silent SSO
 - `--refresh-token=<token>`: set refresh token for current run (deprecated)
 - `--help`: show help
 
